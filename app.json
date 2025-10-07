@@ -16,17 +16,29 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.seuempresa.checklist",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7706311a-a99a-41ec-9acb-2e51ec208f57"
+      }
+    },
+    "owner": "fullstackgabe"
   }
 }
