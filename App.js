@@ -509,12 +509,12 @@ export default function App() {
             <Text style={styles.label}>📍 Localização (link do Maps)</Text>
             <View style={styles.row}>
               <TextInput
-                style={[styles.input, { flex: 1 }]}
+                style={[styles.input, styles.inputInline, { flex: 1 }]}
                 placeholder="https://www.google.com/maps?..."
                 value={form.locClienteLink}
                 onChangeText={(t) => setField('locClienteLink', t)}
               />
-              <Pressable style={styles.btn} onPress={() => useCurrentLocation('locClienteLink')}>
+              <Pressable style={[styles.btn, styles.btnInline]} onPress={() => useCurrentLocation('locClienteLink')}>
                 <Text style={styles.btnText}>Puxar localização</Text>
               </Pressable>
             </View>
@@ -529,12 +529,12 @@ export default function App() {
             <Text style={styles.label}>📍 Localização da CTO (link do Maps)</Text>
             <View style={styles.row}>
               <TextInput
-                style={[styles.input, { flex: 1 }]}
+                style={[styles.input, styles.inputInline, { flex: 1 }]}
                 placeholder="https://www.google.com/maps?..."
                 value={form.locCtoLink}
                 onChangeText={(t) => setField('locCtoLink', t)}
               />
-              <Pressable style={styles.btn} onPress={() => useCurrentLocation('locCtoLink')}>
+              <Pressable style={[styles.btn, styles.btnInline]} onPress={() => useCurrentLocation('locCtoLink')}>
                 <Text style={styles.btnText}>Puxar localização</Text>
               </Pressable>
             </View>
@@ -582,12 +582,12 @@ export default function App() {
             <Text style={styles.label}>📍 Localização da casa (link do Maps)</Text>
             <View style={styles.row}>
               <TextInput
-                style={[styles.input, { flex: 1 }]}
+                style={[styles.input, styles.inputInline, { flex: 1 }]}
                 placeholder="https://www.google.com/maps?..."
                 value={form.locCasaLink}
                 onChangeText={(t) => setField('locCasaLink', t)}
               />
-              <Pressable style={styles.btn} onPress={() => useCurrentLocation('locCasaLink')}>
+              <Pressable style={[styles.btn, styles.btnInline]} onPress={() => useCurrentLocation('locCasaLink')}>
                 <Text style={styles.btnText}>Puxar localização</Text>
               </Pressable>
             </View>
@@ -793,6 +793,11 @@ const styles = StyleSheet.create({
     color: '#222',
     marginBottom: 10,
   },
+  inputInline: {
+    marginBottom: 0,
+    height: 38,
+    paddingVertical: 8,
+  },
   inputWithIcon: {
     paddingRight: 48,
   },
@@ -824,6 +829,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
+  },
+  btnInline: {
+    height: 38,
+    paddingVertical: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   btnText: {
     color: '#fff',
