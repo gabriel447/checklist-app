@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "ios:clean": "expo start -c --ios",
+    "web:clean": "expo start -c --web",
+    "android:clean": "expo start -c --android"
   },
   "dependencies": {
     "expo": "54.0.23",
