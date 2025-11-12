@@ -35,13 +35,17 @@ const makeInitialForm = () => ({
   locClienteLink: '',
   locCtoLink: '',
   fotoCto: null,
+  fotoCtoDataUri: null,
   corFibra: '',
   possuiSplitter: null,
   portaCliente: '',
   locCasaLink: '',
   fotoFrenteCasa: null,
+  fotoFrenteCasaDataUri: null,
   fotoInstalacao: null,
+  fotoInstalacaoDataUri: null,
   fotoMacEquip: null,
+  fotoMacEquipDataUri: null,
   nomeWifi: '',
   senhaWifi: '',
   testeNavegacaoOk: null,
@@ -119,15 +123,37 @@ export default function App() {
       result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         quality: 0.6,
+        base64: true,
       });
     } catch (e) {
+      result = null;
+    }
+    // Se câmera não abriu ou usuário cancelou, tenta galeria
+    if (!result || result.canceled) {
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.6,
+        base64: true,
       });
     }
     if (!result.canceled && result.assets?.[0]?.uri) {
-      setField(fieldKey, result.assets[0].uri);
+      const asset = result.assets[0];
+      const uri = asset.uri;
+      const lower = (uri || '').toLowerCase();
+      const mime = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      const b64 = asset.base64;
+      const dataUriKeyMap = {
+        fotoCto: 'fotoCtoDataUri',
+        fotoFrenteCasa: 'fotoFrenteCasaDataUri',
+        fotoInstalacao: 'fotoInstalacaoDataUri',
+        fotoMacEquip: 'fotoMacEquipDataUri',
+      };
+      const dataKey = dataUriKeyMap[fieldKey];
+      setForm((prev) => ({
+        ...prev,
+        [fieldKey]: uri,
+        ...(dataKey && b64 ? { [dataKey]: `data:${mime};base64,${b64}` } : {}),
+      }));
     }
   };
 
@@ -216,10 +242,15 @@ export default function App() {
         }
       };
 
-      const imgCto = await toBase64(form.fotoCto);
-      const imgCasa = await toBase64(form.fotoFrenteCasa);
-      const imgInst = await toBase64(form.fotoInstalacao);
-      const imgMac = await toBase64(form.fotoMacEquip);
+      const dataOrRead = async (dataUri, uri) => {
+        if (dataUri) return dataUri;
+        return await toBase64(uri);
+      };
+
+      const imgCto = await dataOrRead(form.fotoCtoDataUri, form.fotoCto);
+      const imgCasa = await dataOrRead(form.fotoFrenteCasaDataUri, form.fotoFrenteCasa);
+      const imgInst = await dataOrRead(form.fotoInstalacaoDataUri, form.fotoInstalacao);
+      const imgMac = await dataOrRead(form.fotoMacEquipDataUri, form.fotoMacEquip);
 
       const yesNo = (v) => (v === true ? 'Sim' : v === false ? 'Não' : '—');
       const capitalizeWords = (s) => {
@@ -245,7 +276,9 @@ export default function App() {
             .cardTitle { font-size:16px; font-weight:600; color:#333; }
             .row { margin:6px 0; font-size:13px; color:#444; }
             .label { font-weight:600; }
-            .img { width:100%; height:auto; border-radius:8px; margin:6px 0; }
+            .figure { display:flex; flex-direction:column; align-items:flex-start; margin:8px 0; }
+            .img { width:280px; height:180px; object-fit:cover; border-radius:8px; }
+            .caption { font-size:12px; color:#666; margin-top:4px; text-align:left; }
             a { color:#2f6fed; text-decoration:none; }
             .link { word-break: break-all; }
           </style>
@@ -263,36 +296,36 @@ export default function App() {
             <div class="cardHeader"><div><span class="badge">1</span><span class="cardTitle">Dados do cliente</span></div></div>
             <div class="row"><span class="label">Nome completo:</span> ${capitalizeWords(form.nome) || ''}</div>
             <div class="row"><span class="label">Rua e número:</span> ${form.ruaNumero || ''}</div>
-            <div class="row"><span class="label">Localização (Maps):</span> <span class="link">${form.locClienteLink ? `<a href="${form.locClienteLink}">${form.locClienteLink}</a>` : ''}</span></div>
+            <div class="row"><span class="label">Localização (link do Maps):</span> <span class="link">${form.locClienteLink ? `<a href="${form.locClienteLink}">${form.locClienteLink}</a>` : ''}</span></div>
           </div>
 
           <div class="card">
             <div class="cardHeader"><div><span class="badge">2</span><span class="cardTitle">CTO / rede externa</span></div></div>
-            <div class="row"><span class="label">Localização da CTO (Maps):</span> <span class="link">${form.locCtoLink ? `<a href="${form.locCtoLink}">${form.locCtoLink}</a>` : ''}</span></div>
-            ${imgCto ? `<img class="img" src="${imgCto}" />` : ''}
+            <div class="row"><span class="label">Localização da CTO (link do Maps):</span> <span class="link">${form.locCtoLink ? `<a href="${form.locCtoLink}">${form.locCtoLink}</a>` : ''}</span></div>
+            ${imgCto ? `<div class="row"><span class="label">Foto da CTO</span></div><div class="figure"><img class="img" src="${imgCto}" alt="Foto da CTO" /></div>` : ''}
             <div class="row"><span class="label">Cor da fibra:</span> ${form.corFibra || ''}</div>
-            <div class="row"><span class="label">Possui splitter:</span> ${yesNo(form.possuiSplitter)}</div>
-            <div class="row"><span class="label">Porta utilizada pelo cliente:</span> ${form.portaCliente || ''}</div>
+            <div class="row"><span class="label">Possui splitter?</span> ${yesNo(form.possuiSplitter)}</div>
+            <div class="row"><span class="label">Número da porta utilizada pelo cliente:</span> ${form.portaCliente || ''}</div>
           </div>
 
           <div class="card">
             <div class="cardHeader"><div><span class="badge">3</span><span class="cardTitle">Casa do cliente</span></div></div>
-            <div class="row"><span class="label">Localização da casa (Maps):</span> <span class="link">${form.locCasaLink ? `<a href="${form.locCasaLink}">${form.locCasaLink}</a>` : ''}</span></div>
-            ${imgCasa ? `<img class="img" src="${imgCasa}" />` : ''}
+            <div class="row"><span class="label">Localização da casa (link do Maps):</span> <span class="link">${form.locCasaLink ? `<a href="${form.locCasaLink}">${form.locCasaLink}</a>` : ''}</span></div>
+            ${imgCasa ? `<div class="row"><span class="label">Foto da frente da casa</span></div><div class="figure"><img class="img" src="${imgCasa}" alt="Foto da frente da casa" /></div>` : ''}
           </div>
 
           <div class="card">
             <div class="cardHeader"><div><span class="badge">4</span><span class="cardTitle">Instalação interna</span></div></div>
-            ${imgInst ? `<img class="img" src="${imgInst}" />` : ''}
-            ${imgMac ? `<img class="img" src="${imgMac}" />` : ''}
+            ${imgInst ? `<div class="row"><span class="label">Foto da instalação do equipamento (ONT/Router)</span></div><div class="figure"><img class="img" src="${imgInst}" alt="Foto da instalação do equipamento (ONT/Router)" /></div>` : ''}
+            ${imgMac ? `<div class="row"><span class="label">Foto do MAC do equipamento</span></div><div class="figure"><img class="img" src="${imgMac}" alt="Foto do MAC do equipamento" /></div>` : ''}
             <div class="row"><span class="label">Nome do Wi‑Fi:</span> ${form.nomeWifi || ''}</div>
             <div class="row"><span class="label">Senha do Wi‑Fi:</span> ${form.senhaWifi || ''}</div>
           </div>
 
           <div class="card">
             <div class="cardHeader"><div><span class="badge">5</span><span class="cardTitle">Finalização</span></div></div>
-            <div class="row"><span class="label">Teste de navegação ok:</span> ${yesNo(form.testeNavegacaoOk)}</div>
-            <div class="row"><span class="label">Cliente satisfeito:</span> ${yesNo(form.clienteSatisfeito)}</div>
+            <div class="row"><span class="label">Teste de navegação realizado com sucesso?</span> ${yesNo(form.testeNavegacaoOk)}</div>
+            <div class="row"><span class="label">Cliente ciente e satisfeito com o serviço?</span> ${yesNo(form.clienteSatisfeito)}</div>
           </div>
         </body>
       </html>`;
@@ -315,13 +348,17 @@ export default function App() {
         locClienteLink: row.locClienteLink || '',
         locCtoLink: row.locCtoLink || '',
         fotoCto: row.fotoCto || null,
+        fotoCtoDataUri: row.fotoCtoDataUri || null,
         corFibra: row.corFibra || '',
         possuiSplitter: row.possuiSplitter === 1 ? true : row.possuiSplitter === 0 ? false : null,
         portaCliente: row.portaCliente || '',
         locCasaLink: row.locCasaLink || '',
         fotoFrenteCasa: row.fotoFrenteCasa || null,
+        fotoFrenteCasaDataUri: row.fotoFrenteCasaDataUri || null,
         fotoInstalacao: row.fotoInstalacao || null,
+        fotoInstalacaoDataUri: row.fotoInstalacaoDataUri || null,
         fotoMacEquip: row.fotoMacEquip || null,
+        fotoMacEquipDataUri: row.fotoMacEquipDataUri || null,
         nomeWifi: row.nomeWifi || '',
         senhaWifi: row.senhaWifi || '',
         testeNavegacaoOk: row.testeNavegacaoOk === 1 ? true : row.testeNavegacaoOk === 0 ? false : null,
@@ -581,7 +618,7 @@ export default function App() {
             {form.fotoCto ? (
               <View style={styles.imageWrapper}>
                 <Image source={{ uri: form.fotoCto }} style={styles.image} />
-                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoCto: null })}>
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoCto: null, fotoCtoDataUri: null })}>
                   <Text style={styles.closeBadgeText}>×</Text>
                 </Pressable>
               </View>
@@ -634,7 +671,7 @@ export default function App() {
             {form.fotoFrenteCasa ? (
               <View style={styles.imageWrapper}>
                 <Image source={{ uri: form.fotoFrenteCasa }} style={styles.image} />
-                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoFrenteCasa: null })}>
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoFrenteCasa: null, fotoFrenteCasaDataUri: null })}>
                   <Text style={styles.closeBadgeText}>×</Text>
                 </Pressable>
               </View>
@@ -654,7 +691,7 @@ export default function App() {
             {form.fotoInstalacao ? (
               <View style={styles.imageWrapper}>
                 <Image source={{ uri: form.fotoInstalacao }} style={styles.image} />
-                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoInstalacao: null })}>
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoInstalacao: null, fotoInstalacaoDataUri: null })}>
                   <Text style={styles.closeBadgeText}>×</Text>
                 </Pressable>
               </View>
@@ -667,7 +704,7 @@ export default function App() {
             {form.fotoMacEquip ? (
               <View style={styles.imageWrapper}>
                 <Image source={{ uri: form.fotoMacEquip }} style={styles.image} />
-                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoMacEquip: null })}>
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoMacEquip: null, fotoMacEquipDataUri: null })}>
                   <Text style={styles.closeBadgeText}>×</Text>
                 </Pressable>
               </View>

@@ -18,19 +18,36 @@ export async function initDB() {
         locClienteLink TEXT,
         locCtoLink TEXT,
         fotoCto TEXT,
+        fotoCtoDataUri TEXT,
         corFibra TEXT,
         possuiSplitter INTEGER,
         portaCliente TEXT,
         locCasaLink TEXT,
         fotoFrenteCasa TEXT,
+        fotoFrenteCasaDataUri TEXT,
         fotoInstalacao TEXT,
+        fotoInstalacaoDataUri TEXT,
         fotoMacEquip TEXT,
+        fotoMacEquipDataUri TEXT,
         nomeWifi TEXT,
         senhaWifi TEXT,
         testeNavegacaoOk INTEGER,
         clienteSatisfeito INTEGER
       );
     `);
+
+    // Garantir colunas novas em bancos já existentes
+    const cols = await db.getAllAsync('PRAGMA table_info(checklists)');
+    const names = cols.map((c) => c.name);
+    const addColumnIfMissing = async (name) => {
+      if (!names.includes(name)) {
+        await db.runAsync(`ALTER TABLE checklists ADD COLUMN ${name} TEXT`);
+      }
+    };
+    await addColumnIfMissing('fotoCtoDataUri');
+    await addColumnIfMissing('fotoFrenteCasaDataUri');
+    await addColumnIfMissing('fotoInstalacaoDataUri');
+    await addColumnIfMissing('fotoMacEquipDataUri');
   } catch (e) {
     throw e;
   }
@@ -71,11 +88,11 @@ export async function saveChecklist(data, userId) {
     `INSERT INTO checklists (
       userId, created_at, updated_at,
       nome, ruaNumero, locClienteLink,
-      locCtoLink, fotoCto, corFibra, possuiSplitter, portaCliente,
-      locCasaLink, fotoFrenteCasa,
-      fotoInstalacao, fotoMacEquip, nomeWifi, senhaWifi,
+      locCtoLink, fotoCto, fotoCtoDataUri, corFibra, possuiSplitter, portaCliente,
+      locCasaLink, fotoFrenteCasa, fotoFrenteCasaDataUri,
+      fotoInstalacao, fotoInstalacaoDataUri, fotoMacEquip, fotoMacEquipDataUri, nomeWifi, senhaWifi,
       testeNavegacaoOk, clienteSatisfeito
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
       now,
@@ -85,13 +102,17 @@ export async function saveChecklist(data, userId) {
       data.locClienteLink || '',
       data.locCtoLink || '',
       data.fotoCto || null,
+      data.fotoCtoDataUri || null,
       data.corFibra || '',
       data.possuiSplitter === true ? 1 : data.possuiSplitter === false ? 0 : null,
       data.portaCliente || '',
       data.locCasaLink || '',
       data.fotoFrenteCasa || null,
+      data.fotoFrenteCasaDataUri || null,
       data.fotoInstalacao || null,
+      data.fotoInstalacaoDataUri || null,
       data.fotoMacEquip || null,
+      data.fotoMacEquipDataUri || null,
       data.nomeWifi || '',
       data.senhaWifi || '',
       data.testeNavegacaoOk === true ? 1 : data.testeNavegacaoOk === false ? 0 : null,
@@ -107,9 +128,9 @@ export async function updateChecklist(id, data) {
     `UPDATE checklists SET
       updated_at = ?,
       nome = ?, ruaNumero = ?, locClienteLink = ?,
-      locCtoLink = ?, fotoCto = ?, corFibra = ?, possuiSplitter = ?, portaCliente = ?,
-      locCasaLink = ?, fotoFrenteCasa = ?,
-      fotoInstalacao = ?, fotoMacEquip = ?, nomeWifi = ?, senhaWifi = ?,
+      locCtoLink = ?, fotoCto = ?, fotoCtoDataUri = ?, corFibra = ?, possuiSplitter = ?, portaCliente = ?,
+      locCasaLink = ?, fotoFrenteCasa = ?, fotoFrenteCasaDataUri = ?,
+      fotoInstalacao = ?, fotoInstalacaoDataUri = ?, fotoMacEquip = ?, fotoMacEquipDataUri = ?, nomeWifi = ?, senhaWifi = ?,
       testeNavegacaoOk = ?, clienteSatisfeito = ?
     WHERE id = ?`,
     [
@@ -119,13 +140,17 @@ export async function updateChecklist(id, data) {
       data.locClienteLink || '',
       data.locCtoLink || '',
       data.fotoCto || null,
+      data.fotoCtoDataUri || null,
       data.corFibra || '',
       data.possuiSplitter === true ? 1 : data.possuiSplitter === false ? 0 : null,
       data.portaCliente || '',
       data.locCasaLink || '',
       data.fotoFrenteCasa || null,
+      data.fotoFrenteCasaDataUri || null,
       data.fotoInstalacao || null,
+      data.fotoInstalacaoDataUri || null,
       data.fotoMacEquip || null,
+      data.fotoMacEquipDataUri || null,
       data.nomeWifi || '',
       data.senhaWifi || '',
       data.testeNavegacaoOk === true ? 1 : data.testeNavegacaoOk === false ? 0 : null,
