@@ -15,6 +15,11 @@ export async function getOrCreateUserId() {
   return uid;
 }
 
+export async function setUserId(value) {
+  localStorage.setItem(LS_USER, value);
+  return true;
+}
+
 function readAll() {
   try {
     const raw = localStorage.getItem(LS_KEY);

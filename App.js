@@ -11,19 +11,22 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system';
-import { shareAsync } from 'expo-sharing';
-import {
-  initDB,
-  getOrCreateUserId,
-  listChecklists,
-  getChecklist,
+  import * as FileSystem from 'expo-file-system';
+  import { shareAsync } from 'expo-sharing';
+  import { Feather } from '@expo/vector-icons';
+  import {
+    initDB,
+    getOrCreateUserId,
+    listChecklists,
+    getChecklist,
   saveChecklist,
   updateChecklist,
   deleteChecklist,
+  setUserId,
 } from './db';
 
 const makeInitialForm = () => ({
@@ -68,7 +71,7 @@ export default function App() {
   const [originalForm, setOriginalForm] = useState(makeInitialForm());
 
   const [mode, setMode] = useState('editor'); // 'editor' | 'list'
-  const [userId, setUserId] = useState(null);
+  const [userId, setUserIdState] = useState(null);
   const [currentId, setCurrentId] = useState(null);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,13 +80,16 @@ export default function App() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [saveModalMessage, setSaveModalMessage] = useState('');
+  const [editUserModalVisible, setEditUserModalVisible] = useState(false);
+  const [editUserName, setEditUserName] = useState('');
+  const [showWifiPassword, setShowWifiPassword] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         await initDB();
         const uid = await getOrCreateUserId();
-        setUserId(uid);
+        setUserIdState(uid);
         await refreshList();
       } catch (e) {
         console.error(e);
@@ -111,12 +117,12 @@ export default function App() {
     let result;
     try {
       result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.6,
       });
     } catch (e) {
       result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.6,
       });
     }
@@ -326,7 +332,12 @@ export default function App() {
 
   const Header = () => (
     <View style={styles.header}>
-      <Text style={styles.headerTitle}>📋 Checklist</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={[styles.headerTitle, styles.headerLabel]}>Usuário:</Text>
+        <Pressable onPress={() => { setEditUserName(userId || ''); setEditUserModalVisible(true); }}>
+          <Text style={styles.headerTitle}>{userId || '—'}</Text>
+        </Pressable>
+      </View>
       {mode === 'editor' ? (
         <Pressable style={styles.headerBtn} onPress={() => setMode('list')}>
           <Text style={styles.headerBtnText}>Ver checklists</Text>
@@ -350,7 +361,8 @@ export default function App() {
   const actionLabel = currentId ? 'Salvar alterações' : 'Criar checklist';
 
   return (
-    <View style={styles.container}>
+    <SafeAreaProvider>
+    <SafeAreaView style={styles.container}>
       <Header />
 
       {/* Modal de confirmação de exclusão */}
@@ -370,6 +382,55 @@ export default function App() {
               </Pressable>
               <Pressable style={[styles.btnDanger, { flex: 1 }]} onPress={onConfirmDelete}>
                 <Text style={styles.btnText}>Deletar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de edição do usuário */}
+      <Modal
+        transparent
+        visible={editUserModalVisible}
+        animationType="fade"
+        onRequestClose={() => setEditUserModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Editar usuário</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nome do usuário"
+              value={editUserName}
+              onChangeText={setEditUserName}
+            />
+            <View style={styles.row}>
+              <Pressable
+                style={[styles.btnSecondary, { flex: 1 }]}
+                onPress={() => setEditUserModalVisible(false)}
+              >
+                <Text style={styles.btnSecondaryText}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.btn, { flex: 1 }]}
+                onPress={async () => {
+                  const trimmed = (editUserName || '').trim();
+                  if (!trimmed) {
+                    Alert.alert('Validação', 'Informe um nome válido.');
+                    return;
+                  }
+                  try {
+                    await setUserId(trimmed);
+                    setUserIdState(trimmed);
+                    setEditUserModalVisible(false);
+                    setSaveModalMessage('Usuário atualizado com sucesso.');
+                    setSaveModalVisible(true);
+                  } catch (e) {
+                    Alert.alert('Erro', 'Falha ao salvar nome do usuário.');
+                  }
+                }}
+              >
+                <Text style={styles.btnText}>Salvar</Text>
               </Pressable>
             </View>
           </View>
@@ -420,12 +481,12 @@ export default function App() {
           ))}
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.title}>Usuário: {userId || '—'}</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Removido o rótulo "Usuário:"; nome agora aparece no topo */}
 
           {/* 1) Dados do cliente */}
           <Section
-            title="🧍‍♂️ 1️⃣ Dados do cliente"
+            title="1️⃣ Dados do cliente"
             expanded={expanded.cliente}
             onToggle={() => setExpanded((e) => ({ ...e, cliente: !e.cliente }))}
           >
@@ -461,7 +522,7 @@ export default function App() {
 
           {/* 2) CTO / Rede externa */}
           <Section
-            title="🧵 2️⃣ CTO / rede externa"
+            title="2️⃣ CTO / rede externa"
             expanded={expanded.cto}
             onToggle={() => setExpanded((e) => ({ ...e, cto: !e.cto }))}
           >
@@ -480,9 +541,14 @@ export default function App() {
 
             <Text style={styles.label}>📸 Foto da CTO</Text>
             {form.fotoCto ? (
-              <Image source={{ uri: form.fotoCto }} style={styles.image} />
+              <View style={styles.imageWrapper}>
+                <Image source={{ uri: form.fotoCto }} style={styles.image} />
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoCto: null })}>
+                  <Text style={styles.closeBadgeText}>×</Text>
+                </Pressable>
+              </View>
             ) : null}
-            <Pressable style={styles.btn} onPress={() => askCameraAndPick('fotoCto')}>
+            <Pressable style={[styles.btn, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoCto')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
 
@@ -509,7 +575,7 @@ export default function App() {
 
           {/* 3) Casa do cliente */}
           <Section
-            title="🏡 3️⃣ Casa do cliente"
+            title="3️⃣ Casa do cliente"
             expanded={expanded.casa}
             onToggle={() => setExpanded((e) => ({ ...e, casa: !e.casa }))}
           >
@@ -528,32 +594,47 @@ export default function App() {
 
             <Text style={styles.label}>🏘 Foto da frente da casa</Text>
             {form.fotoFrenteCasa ? (
-              <Image source={{ uri: form.fotoFrenteCasa }} style={styles.image} />
+              <View style={styles.imageWrapper}>
+                <Image source={{ uri: form.fotoFrenteCasa }} style={styles.image} />
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoFrenteCasa: null })}>
+                  <Text style={styles.closeBadgeText}>×</Text>
+                </Pressable>
+              </View>
             ) : null}
-            <Pressable style={styles.btn} onPress={() => askCameraAndPick('fotoFrenteCasa')}>
+            <Pressable style={[styles.btn, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoFrenteCasa')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
           </Section>
 
           {/* 4) Instalação interna */}
           <Section
-            title="📶 4️⃣ Instalação interna"
+            title="4️⃣ Instalação interna"
             expanded={expanded.interna}
             onToggle={() => setExpanded((e) => ({ ...e, interna: !e.interna }))}
           >
             <Text style={styles.label}>🧰 Foto da instalação do equipamento (ONT/Router)</Text>
             {form.fotoInstalacao ? (
-              <Image source={{ uri: form.fotoInstalacao }} style={styles.image} />
+              <View style={styles.imageWrapper}>
+                <Image source={{ uri: form.fotoInstalacao }} style={styles.image} />
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoInstalacao: null })}>
+                  <Text style={styles.closeBadgeText}>×</Text>
+                </Pressable>
+              </View>
             ) : null}
-            <Pressable style={styles.btn} onPress={() => askCameraAndPick('fotoInstalacao')}>
+            <Pressable style={[styles.btn, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoInstalacao')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
 
             <Text style={styles.label}>🏷 Foto do MAC do equipamento</Text>
             {form.fotoMacEquip ? (
-              <Image source={{ uri: form.fotoMacEquip }} style={styles.image} />
+              <View style={styles.imageWrapper}>
+                <Image source={{ uri: form.fotoMacEquip }} style={styles.image} />
+                <Pressable style={styles.closeBadge} onPress={() => setForm({ ...form, fotoMacEquip: null })}>
+                  <Text style={styles.closeBadgeText}>×</Text>
+                </Pressable>
+              </View>
             ) : null}
-            <Pressable style={styles.btn} onPress={() => askCameraAndPick('fotoMacEquip')}>
+            <Pressable style={[styles.btn, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoMacEquip')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
 
@@ -566,18 +647,28 @@ export default function App() {
             />
 
             <Text style={styles.label}>🔑 Senha do Wi-Fi</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Senha"
-              secureTextEntry
-              value={form.senhaWifi}
-              onChangeText={(t) => setField('senhaWifi', t)}
-            />
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={[styles.input, styles.inputWithIcon]}
+                placeholder="Senha"
+                secureTextEntry={!showWifiPassword}
+                value={form.senhaWifi}
+                onChangeText={(t) => setField('senhaWifi', t)}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showWifiPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                style={styles.inputIconBtn}
+                onPress={() => setShowWifiPassword((v) => !v)}
+              >
+                <Feather name={showWifiPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
+              </Pressable>
+            </View>
           </Section>
 
           {/* 5) Finalização */}
           <Section
-            title="✅ 5️⃣ Finalização"
+            title="5️⃣ Finalização"
             expanded={expanded.finalizacao}
             onToggle={() => setExpanded((e) => ({ ...e, finalizacao: !e.finalizacao }))}
           >
@@ -609,7 +700,8 @@ export default function App() {
         </ScrollView>
       )}
       <StatusBar style="auto" />
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -633,6 +725,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#222',
+  },
+  headerLabel: {
+    color: '#555',
+    fontWeight: '600',
   },
   headerBtn: {
     backgroundColor: '#2f6fed',
@@ -697,11 +793,31 @@ const styles = StyleSheet.create({
     color: '#222',
     marginBottom: 10,
   },
+  inputWithIcon: {
+    paddingRight: 48,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 8,
+  },
+  inputWrapper: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  inputIconBtn: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    transform: [{ translateY: -14 }],
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    minWidth: 36,
+  },
+  inputIconText: {
+    fontSize: 16,
   },
   btn: {
     backgroundColor: '#2f6fed',
@@ -744,6 +860,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
     backgroundColor: '#e9ecf3',
+  },
+  imageWrapper: {
+    position: 'relative',
+  },
+  closeBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBadgeText: {
+    color: '#fff',
+    fontWeight: '700',
+    lineHeight: 20,
   },
   toggleRow: {
     flexDirection: 'row',
