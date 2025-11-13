@@ -10,6 +10,7 @@ import {
   Pressable,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -547,21 +548,23 @@ export default function App() {
 
   const Header = () => (
     <View style={styles.header}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-        <Text style={[styles.headerTitle, styles.headerLabel]}>Usuário:</Text>
-        <Pressable style={{ flexShrink: 1, minWidth: 0 }} onPress={() => { setEditUserName(userId || ''); setEditUserModalVisible(true); }}>
-          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{userId || '—'}</Text>
-        </Pressable>
+      <View style={styles.headerInner}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <Text style={[styles.headerTitle, styles.headerLabel]}>Usuário:</Text>
+          <Pressable style={{ flexShrink: 1, minWidth: 0 }} onPress={() => { setEditUserName(userId || ''); setEditUserModalVisible(true); }}>
+            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{userId || '—'}</Text>
+          </Pressable>
+        </View>
+        {mode === 'editor' ? (
+          <Pressable style={styles.headerBtn} onPress={() => setMode('list')}>
+            <Text style={styles.headerBtnText}>Ver checklists</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.headerBtn} onPress={() => { resetUIForNew(); setMode('editor'); }}>
+            <Text style={styles.headerBtnText}>Voltar</Text>
+          </Pressable>
+        )}
       </View>
-      {mode === 'editor' ? (
-        <Pressable style={styles.headerBtn} onPress={() => setMode('list')}>
-          <Text style={styles.headerBtnText}>Ver checklists</Text>
-        </Pressable>
-      ) : (
-        <Pressable style={styles.headerBtn} onPress={() => { resetUIForNew(); setMode('editor'); }}>
-          <Text style={styles.headerBtnText}>Voltar</Text>
-        </Pressable>
-      )}
     </View>
   );
 
@@ -664,7 +667,7 @@ export default function App() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Sucesso</Text>
             <Text style={styles.modalText}>{saveModalMessage}</Text>
-            <Pressable style={styles.btn} onPress={() => setSaveModalVisible(false)}>
+            <Pressable style={[styles.btn, styles.modalBtn]} onPress={() => setSaveModalVisible(false)}>
               <Text style={styles.btnText}>OK</Text>
             </Pressable>
           </View>
@@ -673,34 +676,37 @@ export default function App() {
 
       {mode === 'list' ? (
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.content}>
             <Text style={styles.title}>Checklists</Text>
-          {Object.keys(groupedList).length === 0 && (
-            <Text style={{ color: '#666' }}>Nenhum checklist salvo ainda.</Text>
-          )}
-          {Object.entries(groupedList).map(([dateStr, items]) => (
-            <View key={dateStr} style={styles.section}>
-              <Text style={styles.sectionTitle}>{dateStr}</Text>
-              <View style={{ marginTop: 8 }}>
-                {items.map((it) => (
-                  <View key={it.id} style={styles.listItem}>
-                    <Pressable style={{ flex: 1 }} onPress={() => loadChecklist(it.id)}>
-                      <Text style={styles.listItemTitle} numberOfLines={2} ellipsizeMode="tail">{it.nome || 'Sem nome'}</Text>
-                      <Text style={styles.listItemSub}>{new Date(it.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Text>
-                    </Pressable>
-                    <Pressable style={styles.btnSecondary} onPress={() => onExportPdfItem(it.id)}>
-                      <Text style={styles.btnSecondaryText}>Exportar</Text>
-                    </Pressable>
-                    <Pressable style={styles.delBtn} onPress={() => onDeleteRequest(it.id)}>
-                      <Text style={styles.delBtnText}>Deletar</Text>
-                    </Pressable>
-                  </View>
-                ))}
+            {Object.keys(groupedList).length === 0 && (
+              <Text style={{ color: '#666' }}>Nenhum checklist salvo ainda.</Text>
+            )}
+            {Object.entries(groupedList).map(([dateStr, items]) => (
+              <View key={dateStr} style={styles.section}>
+                <Text style={styles.sectionTitle}>{dateStr}</Text>
+                <View style={{ marginTop: 8 }}>
+                  {items.map((it) => (
+                    <View key={it.id} style={styles.listItem}>
+                      <Pressable style={{ flex: 1 }} onPress={() => loadChecklist(it.id)}>
+                        <Text style={styles.listItemTitle} numberOfLines={2} ellipsizeMode="tail">{it.nome || 'Sem nome'}</Text>
+                        <Text style={styles.listItemSub}>{new Date(it.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Text>
+                      </Pressable>
+                      <Pressable style={styles.btnSecondary} onPress={() => onExportPdfItem(it.id)}>
+                        <Text style={styles.btnSecondaryText}>Exportar</Text>
+                      </Pressable>
+                      <Pressable style={styles.delBtn} onPress={() => onDeleteRequest(it.id)}>
+                        <Text style={styles.delBtnText}>Deletar</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </ScrollView>
       ) : (
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>
         {/* Removido o rótulo "Usuário:"; nome agora aparece no topo */}
 
           {/* 1) Dados do cliente */}
@@ -951,6 +957,7 @@ export default function App() {
           ) : null}
 
           <View style={{ height: 24 }} />
+        </View>
         </ScrollView>
       )}
       <StatusBar style="auto" />
@@ -968,12 +975,18 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingHorizontal: 16,
     paddingBottom: 8,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  headerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: Platform.OS === 'web' ? 'center' : 'auto',
   },
   headerTitle: {
     fontSize: 18,
@@ -997,6 +1010,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
+  },
+  content: {
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: Platform.OS === 'web' ? 'center' : 'auto',
   },
   title: {
     fontSize: 16,
@@ -1042,15 +1060,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f3f7',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    paddingVertical: Platform.OS === 'web' ? 8 : 10,
+    fontSize: Platform.OS === 'web' ? 13 : 14,
     color: '#222',
     marginBottom: 10,
   },
   inputInline: {
     marginBottom: 0,
-    height: 38,
-    paddingVertical: 8,
+    height: Platform.OS === 'web' ? 36 : 38,
+    paddingVertical: Platform.OS === 'web' ? 6 : 8,
   },
   inputWithIcon: {
     paddingRight: 48,
@@ -1202,7 +1220,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalBox: {
-    width: '85%',
+    width: Platform.OS === 'web' ? 560 : '85%',
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 16,
@@ -1217,5 +1235,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#444',
     marginBottom: 12,
+  },
+  modalBtn: {
+    alignSelf: Platform.OS === 'web' ? 'flex-end' : 'auto',
+    minWidth: Platform.OS === 'web' ? 120 : undefined,
   },
 });
