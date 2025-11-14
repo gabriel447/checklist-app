@@ -949,7 +949,7 @@ export default function App() {
 
   const [expandedMonths, setExpandedMonths] = useState({});
 
-  const actionLabel = currentId ? 'Salvar alterações' : 'Criar Checklist';
+  const actionLabel = currentId ? 'Salvar Alterações' : 'Criar Checklist';
   const wantsAuthRoute = Platform.OS === 'web' && (route === '/login' || route === '/cadastrar');
   const effectiveMode = Platform.OS === 'web' && (!userId || wantsAuthRoute) ? 'auth' : mode;
 
