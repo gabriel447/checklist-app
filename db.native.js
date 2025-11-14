@@ -1,207 +1,347 @@
-import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient } from '@supabase/supabase-js';
 
 let db;
+let supabase;
+const getClient = () => {
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const key = process.env.EXPO_PUBLIC_SUPABASE_KEY;
+  if (!url || !key) return null;
+  if (!supabase)
+    supabase = createClient(url, key, {
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    });
+  return supabase;
+};
+
+export const isSupabaseReady = () =>
+  !!(process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_KEY);
 
 export async function initDB() {
-  try {
-    db = await SQLite.openDatabaseAsync('checklist.db');
-    await db.execAsync(`
-      PRAGMA journal_mode = WAL;
-      CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY NOT NULL, value TEXT);
-      CREATE TABLE IF NOT EXISTS checklists (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId TEXT,
-        created_at INTEGER,
-        updated_at INTEGER,
-        nome TEXT,
-        ruaNumero TEXT,
-        locClienteLink TEXT,
-        locCtoLink TEXT,
-        fotoCto TEXT,
-        fotoCtoDataUri TEXT,
-        corFibra TEXT,
-        possuiSplitter INTEGER,
-        portaCliente TEXT,
-        locCasaLink TEXT,
-        fotoFrenteCasa TEXT,
-        fotoFrenteCasaDataUri TEXT,
-        fotoInstalacao TEXT,
-        fotoInstalacaoDataUri TEXT,
-        fotoMacEquip TEXT,
-        fotoMacEquipDataUri TEXT,
-        nomeWifi TEXT,
-        senhaWifi TEXT,
-        testeNavegacaoOk INTEGER,
-        clienteSatisfeito INTEGER
-      );
-    `);
-
-    // Garantir colunas novas em bancos já existentes
-    const cols = await db.getAllAsync('PRAGMA table_info(checklists)');
-    const names = cols.map((c) => c.name);
-    const addColumnIfMissing = async (name) => {
-      if (!names.includes(name)) {
-        await db.runAsync(`ALTER TABLE checklists ADD COLUMN ${name} TEXT`);
-      }
-    };
-    await addColumnIfMissing('fotoCtoDataUri');
-    await addColumnIfMissing('fotoFrenteCasaDataUri');
-    await addColumnIfMissing('fotoInstalacaoDataUri');
-    await addColumnIfMissing('fotoMacEquipDataUri');
-  } catch (e) {
-    throw e;
-  }
+  return Promise.resolve();
 }
 
 export async function getOrCreateUserId() {
-  const row = await db.getFirstAsync('SELECT value FROM meta WHERE key = ? LIMIT 1', [
-    'userId',
-  ]);
-  if (row && row.value) return row.value;
-  const random = 'user' + Math.floor(1000 + Math.random() * 9000);
-  await db.runAsync('INSERT INTO meta (key, value) VALUES (?, ?)', ['userId', random]);
-  return random;
+  const client = getClient();
+  if (!client) return null;
+  const { data } = await client.auth.getUser();
+  return data?.user?.id || null;
 }
 
-export async function setUserId(value) {
-  const res = await db.runAsync('UPDATE meta SET value = ? WHERE key = ?', [value, 'userId']);
-  if (res.changes === 0) {
-    await db.runAsync('INSERT INTO meta (key, value) VALUES (?, ?)', ['userId', value]);
-  }
+export async function setUserId() {
   return true;
 }
 
+const toIntBool = (v) => (v === true ? 1 : v === false ? 0 : null);
+
 export async function listChecklists(userId) {
+  const client = getClient();
+  if (!client) return [];
   if (!userId) return [];
-  return await db.getAllAsync(
-    'SELECT id, nome, created_at, updated_at FROM checklists WHERE userId = ? ORDER BY created_at DESC',
-    [userId]
-  );
+  const { data } = await client
+    .from('checklists')
+    .select('id,nome,created_at,updated_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  return data || [];
 }
 
 export async function getChecklist(id, userId) {
+  const client = getClient();
+  if (!client) return null;
   if (!userId) return null;
-  const row = await db.getFirstAsync('SELECT * FROM checklists WHERE id = ? AND userId = ?', [
-    id,
-    userId,
-  ]);
-  return row ?? null;
+  const { data } = await client
+    .from('checklists')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data || null;
+}
+
+export async function getChecklistMeta(id, userId) {
+  const client = getClient();
+  if (!client) return null;
+  if (!userId) return null;
+  const { data } = await client
+    .from('checklists')
+    .select(
+      'id,nome,ruanumero,locclientelink,locctolink,corfibra,possuisplitter,portacliente,loccasalink,nomewifi,senhawifi,testenavegacaook,clientesatisfeito,created_at,updated_at'
+    )
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data || null;
+}
+
+export async function getChecklistImages(id, userId) {
+  const client = getClient();
+  if (!client) return null;
+  if (!userId) return null;
+  const { data } = await client
+    .from('checklists')
+    .select('fotoctodatauri,fotofrentecasadatauri,fotoinstalacaodatauri,fotomacequipdatauri')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data || null;
 }
 
 export async function saveChecklist(data, userId) {
-  const now = Date.now();
-  const result = await db.runAsync(
-    `INSERT INTO checklists (
-      userId, created_at, updated_at,
-      nome, ruaNumero, locClienteLink,
-      locCtoLink, fotoCto, fotoCtoDataUri, corFibra, possuiSplitter, portaCliente,
-      locCasaLink, fotoFrenteCasa, fotoFrenteCasaDataUri,
-      fotoInstalacao, fotoInstalacaoDataUri, fotoMacEquip, fotoMacEquipDataUri, nomeWifi, senhaWifi,
-      testeNavegacaoOk, clienteSatisfeito
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      userId,
-      now,
-      now,
-      data.nome || '',
-      data.ruaNumero || '',
-      data.locClienteLink || '',
-      data.locCtoLink || '',
-      data.fotoCto || null,
-      data.fotoCtoDataUri || null,
-      data.corFibra || '',
-      data.possuiSplitter === true ? 1 : data.possuiSplitter === false ? 0 : null,
-      data.portaCliente || '',
-      data.locCasaLink || '',
-      data.fotoFrenteCasa || null,
-      data.fotoFrenteCasaDataUri || null,
-      data.fotoInstalacao || null,
-      data.fotoInstalacaoDataUri || null,
-      data.fotoMacEquip || null,
-      data.fotoMacEquipDataUri || null,
-      data.nomeWifi || '',
-      data.senhaWifi || '',
-      data.testeNavegacaoOk === true ? 1 : data.testeNavegacaoOk === false ? 0 : null,
-      data.clienteSatisfeito === true ? 1 : data.clienteSatisfeito === false ? 0 : null,
-    ]
-  );
-  return result.lastInsertRowId;
+  const client = getClient();
+  if (!client) throw new Error('Supabase não configurado');
+  const nowISO = new Date().toISOString();
+  const payload = {
+    user_id: userId || null,
+    created_at: nowISO,
+    updated_at: nowISO,
+    nome: data.nome || '',
+    ruaNumero: data.ruaNumero || '',
+    locClienteLink: data.locClienteLink || '',
+    locCtoLink: data.locCtoLink || '',
+    corfibra: data.corFibra || '',
+    possuisplitter: toIntBool(data.possuiSplitter),
+    portaCliente: data.portaCliente || '',
+    locCasaLink: data.locCasaLink || '',
+    nomewifi: data.nomeWifi || '',
+    senhawifi: data.senhaWifi || '',
+    testenavegacaook: toIntBool(data.testeNavegacaoOk),
+    clientesatisfeito: toIntBool(data.clienteSatisfeito),
+  };
+  const { data: inserted, error } = await client
+    .from('checklists')
+    .insert(payload)
+    .select('id')
+    .single();
+  if (error) throw error;
+  const newId = inserted?.id;
+  if (!newId) return null;
+  const setColumn = async (col, value) => {
+    if (!value) return;
+    await client
+      .from('checklists')
+      .update({ [col]: value })
+      .eq('id', newId)
+      .eq('user_id', userId);
+  };
+  try {
+    await setColumn('fotoctodatauri', data.fotoCtoDataUri || null);
+    await setColumn('fotofrentecasadatauri', data.fotoFrenteCasaDataUri || null);
+    await setColumn('fotoinstalacaodatauri', data.fotoInstalacaoDataUri || null);
+    await setColumn('fotomacequipdatauri', data.fotoMacEquipDataUri || null);
+  } catch {}
+  return newId;
 }
 
 export async function updateChecklist(id, data, userId) {
-  const now = Date.now();
-  await db.runAsync(
-    `UPDATE checklists SET
-      updated_at = ?,
-      nome = ?, ruaNumero = ?, locClienteLink = ?,
-      locCtoLink = ?, fotoCto = ?, fotoCtoDataUri = ?, corFibra = ?, possuiSplitter = ?, portaCliente = ?,
-      locCasaLink = ?, fotoFrenteCasa = ?, fotoFrenteCasaDataUri = ?,
-      fotoInstalacao = ?, fotoInstalacaoDataUri = ?, fotoMacEquip = ?, fotoMacEquipDataUri = ?, nomeWifi = ?, senhaWifi = ?,
-      testeNavegacaoOk = ?, clienteSatisfeito = ?
-    WHERE id = ? AND userId = ?`,
-    [
-      now,
-      data.nome || '',
-      data.ruaNumero || '',
-      data.locClienteLink || '',
-      data.locCtoLink || '',
-      data.fotoCto || null,
-      data.fotoCtoDataUri || null,
-      data.corFibra || '',
-      data.possuiSplitter === true ? 1 : data.possuiSplitter === false ? 0 : null,
-      data.portaCliente || '',
-      data.locCasaLink || '',
-      data.fotoFrenteCasa || null,
-      data.fotoFrenteCasaDataUri || null,
-      data.fotoInstalacao || null,
-      data.fotoInstalacaoDataUri || null,
-      data.fotoMacEquip || null,
-      data.fotoMacEquipDataUri || null,
-      data.nomeWifi || '',
-      data.senhaWifi || '',
-      data.testeNavegacaoOk === true ? 1 : data.testeNavegacaoOk === false ? 0 : null,
-      data.clienteSatisfeito === true ? 1 : data.clienteSatisfeito === false ? 0 : null,
-      id,
-      userId,
-    ]
-  );
+  const client = getClient();
+  if (!client) throw new Error('Supabase não configurado');
+  if (!userId) throw new Error('Usuário inválido');
+  const nowISO = new Date().toISOString();
+  const payload = {
+    updated_at: nowISO,
+    nome: data.nome || '',
+    ruaNumero: data.ruaNumero || '',
+    locClienteLink: data.locClienteLink || '',
+    locCtoLink: data.locCtoLink || '',
+    corfibra: data.corFibra || '',
+    possuisplitter: toIntBool(data.possuiSplitter),
+    portaCliente: data.portaCliente || '',
+    locCasaLink: data.locCasaLink || '',
+    nomewifi: data.nomeWifi || '',
+    senhawifi: data.senhaWifi || '',
+    testenavegacaook: toIntBool(data.testeNavegacaoOk),
+    clientesatisfeito: toIntBool(data.clienteSatisfeito),
+  };
+  const { error } = await client
+    .from('checklists')
+    .update(payload)
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+  const setColumn = async (col, value) => {
+    if (value == null) return;
+    await client
+      .from('checklists')
+      .update({ [col]: value })
+      .eq('id', id)
+      .eq('user_id', userId);
+  };
+  try {
+    await setColumn('fotoctodatauri', data.fotoCtoDataUri ?? null);
+    await setColumn('fotofrentecasadatauri', data.fotoFrenteCasaDataUri ?? null);
+    await setColumn('fotoinstalacaodatauri', data.fotoInstalacaoDataUri ?? null);
+    await setColumn('fotomacequipdatauri', data.fotoMacEquipDataUri ?? null);
+  } catch {}
   return true;
 }
 
 export async function deleteChecklist(id, userId) {
-  if (!userId) return true;
-  await db.runAsync('DELETE FROM checklists WHERE id = ? AND userId = ?', [id, userId]);
+  const client = getClient();
+  if (!client) throw new Error('Supabase não configurado');
+  if (!userId) throw new Error('Usuário inválido');
+  await client
+    .from('checklists')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
   return true;
 }
 
 export async function getCurrentUser() {
-  return null;
+  const client = getClient();
+  if (!client) return null;
+  const { data } = await client.auth.getUser();
+  return data?.user || null;
 }
 
-export async function signIn() {
-  return null;
+export async function signIn({ email, password }) {
+  const client = getClient();
+  if (!client) throw new Error('Supabase não configurado');
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error) return null;
+  const user = data.user || null;
+  if (user) {
+    try {
+      const { data: existing } = await client
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!existing) {
+        const md = user.user_metadata || {};
+        await client
+          .from('users')
+          .upsert({
+            id: user.id,
+            first_name: md.first_name || '',
+            last_name: md.last_name || '',
+            phone: md.phone || '',
+            cpf: md.cpf || '',
+          });
+      }
+    } catch {}
+  }
+  return user;
 }
 
-export async function signUp() {
-  return null;
+export async function signUp({ email, password, firstName, lastName, phone, cpf }) {
+  const client = getClient();
+  if (!client) return { user: null, session: null, error: 'Supabase não configurado' };
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        first_name: firstName || null,
+        last_name: lastName || null,
+        phone: phone || null,
+        cpf: cpf || null,
+        display_name: `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || null,
+      },
+    },
+  });
+  if (error) return { user: null, session: null, error: error?.message || 'Falha ao cadastrar' };
+  if (!data?.session && email && password) {
+    try {
+      const r = await client.auth.signInWithPassword({ email, password });
+      if (r?.error) {
+        return { user: data?.user || null, session: null, error: r.error.message };
+      }
+    } catch (e) {
+      return { user: data?.user || null, session: null, error: 'Confirmação de e‑mail necessária' };
+    }
+  }
+  const curr = await client.auth.getUser();
+  const sessionRes = await client.auth.getSession();
+  const session = sessionRes?.data?.session || null;
+  const userId = curr?.data?.user?.id || data?.user?.id;
+  if (userId && session) {
+    try {
+      const { error: upErr } = await client
+        .from('users')
+        .upsert({
+          id: userId,
+          first_name: firstName || '',
+          last_name: lastName || '',
+          phone: phone || '',
+          cpf: cpf || '',
+        });
+      if (upErr) return { user: data?.user || null, session, error: upErr.message };
+    } catch (e) {
+      return { user: data?.user || null, session, error: 'Falha ao salvar perfil' };
+    }
+  }
+  const out = await client.auth.getUser();
+  return { user: out?.data?.user || data?.user || null, session, error: null };
 }
 
 export async function signOut() {
+  const client = getClient();
+  if (!client) return true;
+  await client.auth.signOut();
   return true;
 }
 
-export async function updateProfile(userId, { firstName, lastName, phone }) {
+export async function updateProfile(userId, { firstName, lastName, phone, cpf }) {
+  const client = getClient();
+  if (!client) throw new Error('Supabase não configurado');
+  const { error } = await client
+    .from('users')
+    .upsert({
+      id: userId,
+      first_name: firstName ?? '',
+      last_name: lastName ?? '',
+      phone: phone ?? '',
+      cpf: cpf ?? null,
+    });
+  if (error) throw new Error(error.message);
   return true;
 }
 
-export async function updateAuth() {
+export async function updateAuth({ email, password, firstName, lastName, phone, cpf }) {
+  const client = getClient();
+  if (!client) throw new Error('Supabase não configurado');
+  const data = {
+    ...(email ? { email } : {}),
+    ...(password ? { password } : {}),
+    data: {
+      ...(firstName ? { first_name: firstName } : {}),
+      ...(lastName ? { last_name: lastName } : {}),
+      ...(phone ? { phone } : {}),
+      ...(cpf ? { cpf } : {}),
+      display_name: `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || null,
+    },
+  };
+  await client.auth.updateUser(data);
   return true;
 }
 
-export async function getProfile() {
-  return null;
+export async function getProfile(userId) {
+  const client = getClient();
+  if (!client) return null;
+  const { data } = await client
+    .from('users')
+    .select('first_name,last_name,phone,cpf')
+    .eq('id', userId)
+    .maybeSingle();
+  return data || null;
 }
 
-export async function findUserByCpf() {
-  return null;
+export async function findUserByCpf(cpf) {
+  const client = getClient();
+  if (!client) return null;
+  const digits = (cpf || '').replace(/\D+/g, '');
+  if (!digits) return null;
+  const { data } = await client
+    .from('users')
+    .select('id')
+    .eq('cpf', digits)
+    .maybeSingle();
+  return data || null;
 }

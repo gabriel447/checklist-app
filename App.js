@@ -328,9 +328,19 @@ export default function App() {
             }
           }
         } else {
-          const uid = await getOrCreateUserId();
-          setUserIdState(uid);
-          await refreshList();
+          const u = await getCurrentUser();
+          if (u && u.id) {
+            setUserIdState(u.id);
+            try {
+              const p = await getProfile(u.id);
+              const nm = [p?.first_name, p?.last_name].filter(Boolean).join(' ').trim();
+              setUserName(nm || p?.first_name || null);
+            } catch {}
+            await refreshList();
+          } else {
+            setAuthMode('login');
+            setMode('auth');
+          }
         }
       } catch (e) {
         console.error(e);
@@ -987,44 +997,34 @@ export default function App() {
   const Header = () => (
     <View style={styles.header}>
       <View style={styles.headerInner}>
-        {Platform.OS === 'web' ? (
-          <Pressable
-            style={[styles.headerIconBtn, styles.pointerCursor]}
-            onPress={async () => {
-              if (mode === 'auth') return;
-              try {
-                let firstN = '', lastN = '', phoneN = '', emailN = '', cpfN = '';
-                const u = await getCurrentUser();
-                const uid = u?.id || userId;
-                emailN = u?.email || '';
-                if (uid) {
-                  const p = await getProfile(uid);
-                  firstN = p?.first_name || '';
-                  lastN = p?.last_name || '';
-                  phoneN = p?.phone || '';
-                  cpfN = p?.cpf || '';
-                }
-                setEditFirstName(firstN);
-                setEditLastName(lastN);
-                setEditPhone(phoneN ? formatPhoneBR(phoneN) : '');
-                setEditEmail(emailN || '');
-                setEditCpf(cpfN ? formatCpfBR(cpfN) : '');
-                setEditNewPassword('');
-                setShowEditPassword(false);
-              } catch {}
-              setEditUserModalVisible(true);
-            }}
-          >
-            <MaterialCommunityIcons name="account-edit" size={40} color="#6b7280" />
-          </Pressable>
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-            <Text style={[styles.headerTitle, styles.headerLabel]}>Usuário:</Text>
-            <Pressable style={{ flexShrink: 1, minWidth: 0 }} onPress={() => { if (mode !== 'auth') { setEditUserName(userName || userId || ''); setEditUserModalVisible(true); } }}>
-              <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{userName || userId || '—'}</Text>
-            </Pressable>
-          </View>
-        )}
+        <Pressable
+          style={[styles.headerIconBtn, styles.pointerCursor]}
+          onPress={async () => {
+            if (mode === 'auth') return;
+            try {
+              let firstN = '', lastN = '', phoneN = '', emailN = '', cpfN = '';
+              const u = await getCurrentUser();
+              const uid = u?.id || userId;
+              emailN = u?.email || '';
+              if (uid) {
+                const p = await getProfile(uid);
+                firstN = p?.first_name || '';
+                lastN = p?.last_name || '';
+                phoneN = p?.phone || '';
+                cpfN = p?.cpf || '';
+              }
+              setEditFirstName(firstN);
+              setEditLastName(lastN);
+              setEditPhone(phoneN ? formatPhoneBR(phoneN) : '');
+              setEditEmail(emailN || '');
+              setEditNewPassword('');
+              setShowEditPassword(false);
+            } catch {}
+            setEditUserModalVisible(true);
+          }}
+        >
+          <MaterialCommunityIcons name="account-edit" size={40} color="#6b7280" />
+        </Pressable>
         <View style={{ flexDirection: 'row', gap: 8, marginLeft: 8 }}>
           {effectiveMode !== 'auth' ? (
             <>
@@ -1041,14 +1041,12 @@ export default function App() {
                   <Text style={styles.headerBtnText}>Voltar</Text>
                 </Pressable>
               )}
-              {Platform.OS === 'web' ? (
-                <Pressable
-                  style={[styles.headerBtn, styles.headerBtnLogout]}
-                  onPress={onLogout}
-                >
-                  <Text style={styles.headerBtnText}>Sair</Text>
-                </Pressable>
-              ) : null}
+              <Pressable
+                style={[styles.headerBtn, styles.headerBtnLogout]}
+                onPress={onLogout}
+              >
+                <Text style={styles.headerBtnText}>Sair</Text>
+              </Pressable>
             </>
           ) : null}
         </View>
@@ -1113,95 +1111,72 @@ export default function App() {
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalBox}>
-            {Platform.OS === 'web' ? (
-              <>
-                <Text style={styles.modalTitle}>Editar perfil</Text>
+            <>
+              <Text style={styles.modalTitle}>Editar perfil</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nome"
+                placeholderTextColor="#9aa0b5"
+                value={editFirstName}
+                onChangeText={(t) => setEditFirstName(toTitleCase(t.replace(/[^A-Za-zÀ-ÿ\s'\-]/g, '')))}
+                maxLength={50}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Sobrenome"
+                placeholderTextColor="#9aa0b5"
+                value={editLastName}
+                onChangeText={(t) => setEditLastName(toTitleCase(t.replace(/[^A-Za-zÀ-ÿ\s'\-]/g, '')))}
+                maxLength={50}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Telefone"
+                placeholderTextColor="#9aa0b5"
+                value={editPhone}
+                onChangeText={(t) => setEditPhone(formatPhoneBR(t))}
+                keyboardType="phone-pad"
+                maxLength={20}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="E-mail"
+                placeholderTextColor="#9aa0b5"
+                value={editEmail}
+                onChangeText={setEditEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <View style={styles.inputWrapper}>
                 <TextInput
-                  style={styles.input}
-                  placeholder="Nome"
+                  style={[styles.input, styles.inputWithIcon]}
+                  placeholder="Nova senha (opcional)"
                   placeholderTextColor="#9aa0b5"
-                  value={editFirstName}
-                  onChangeText={(t) => setEditFirstName(toTitleCase(t.replace(/[^A-Za-zÀ-ÿ\s'\-]/g, '')))}
-                  maxLength={50}
-                  autoCapitalize="words"
-                  autoCorrect={false}
+                  value={editNewPassword}
+                  onChangeText={setEditNewPassword}
+                  secureTextEntry={!showEditPassword}
+                  autoComplete="off"
+                  textContentType="none"
                 />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Sobrenome"
-                  placeholderTextColor="#9aa0b5"
-                  value={editLastName}
-                  onChangeText={(t) => setEditLastName(toTitleCase(t.replace(/[^A-Za-zÀ-ÿ\s'\-]/g, '')))}
-                  maxLength={50}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Telefone"
-                  placeholderTextColor="#9aa0b5"
-                  value={editPhone}
-                  onChangeText={(t) => setEditPhone(formatPhoneBR(t))}
-                  keyboardType="phone-pad"
-                  maxLength={20}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="CPF"
-                  placeholderTextColor="#9aa0b5"
-                  value={editCpf}
-                  onChangeText={(t) => setEditCpf(formatCpfBR(t))}
-                  keyboardType="number-pad"
-                  maxLength={14}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="E-mail"
-                  placeholderTextColor="#9aa0b5"
-                  value={editEmail}
-                  onChangeText={setEditEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={[styles.input, styles.inputWithIcon]}
-                    placeholder="Nova senha (opcional)"
-                    placeholderTextColor="#9aa0b5"
-                    value={editNewPassword}
-                    onChangeText={setEditNewPassword}
-                    secureTextEntry={!showEditPassword}
-                    autoComplete="off"
-                    textContentType="none"
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={showEditPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                    style={styles.inputIconBtn}
-                    onPress={() => setShowEditPassword((v) => !v)}
-                  >
-                    <Feather name={showEditPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
-                  </Pressable>
-                </View>
-                <View style={styles.inputHelpArea}>
-                  {editNewPassword && editNewPassword.length >= 12 && !isStrongPassword(editNewPassword) ? (
-                    <Text style={styles.inputHelpError}>A senha deve ter 12+ chars, maiúscula, números e símbolo.</Text>
-                  ) : null}
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.modalTitle}>Editar usuário</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nome do usuário"
-                  placeholderTextColor="#9aa0b5"
-                  value={editUserName}
-                  onChangeText={setEditUserName}
-                  maxLength={60}
-                />
-              </>
-            )}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={showEditPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  style={styles.inputIconBtn}
+                  onPress={() => setShowEditPassword((v) => !v)}
+                >
+                  <Feather name={showEditPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
+                </Pressable>
+              </View>
+              <View style={styles.inputHelpArea}>
+                {editNewPassword && editNewPassword.length >= 12 && !isStrongPassword(editNewPassword) ? (
+                  <Text style={styles.inputHelpError}>A senha deve ter 12+ chars, maiúscula, números e símbolo.</Text>
+                ) : null}
+              </View>
+            </>
             <View style={styles.row}>
               <Pressable
                 style={[styles.btnSecondary, { flex: 1 }]}
@@ -1213,47 +1188,30 @@ export default function App() {
                 const firstName = (editFirstName || '').trim();
                 const lastName = (editLastName || '').trim();
                 const phoneDigits = (editPhone || '').replace(/\D+/g, '');
-                const cpfDigits = (editCpf || '').replace(/\D+/g, '');
                 const email = (editEmail || '').trim();
                 const passOk = !editNewPassword || isStrongPassword(editNewPassword);
-                const readyWeb = Platform.OS === 'web'
-                  ? !!firstName && !!lastName && phoneDigits.length === 11 && isValidEmail(email) && passOk && isValidCpf(editCpf)
-                  : !!(editUserName || '').trim();
+                const ready = !!firstName && !!lastName && phoneDigits.length === 11 && isValidEmail(email) && passOk;
                 return (
                   <Pressable
-                    style={[styles.btn, (!readyWeb) && styles.btnDisabled, { flex: 1 }]}
-                    disabled={!readyWeb}
+                    style={[styles.btn, (!ready) && styles.btnDisabled, { flex: 1 }]}
+                    disabled={!ready}
                     onPress={async () => {
-                      if (Platform.OS === 'web') {
-                        try {
-                          if (userId) {
-                            await updateProfile(userId, { firstName, lastName, phone: phoneDigits, cpf: cpfDigits });
-                            await updateAuth({ email, password: editNewPassword || undefined, firstName, lastName, phone: phoneDigits, cpf: cpfDigits });
-                            setUserName([firstName, lastName].filter(Boolean).join(' '));
-                          }
-                          setEditUserModalVisible(false);
-                          setBannerType('success');
-                          setSaveModalMessage('Usuário atualizado com sucesso.');
-                          setSaveModalVisible(true);
-                        } catch (e) {
-                          const msg = (e?.message || '').toLowerCase();
-                          const pretty = msg.includes('cpf') && (msg.includes('duplicate') || msg.includes('unique')) ? 'CPF já cadastrado.' : (e?.message || 'Falha ao atualizar usuário.');
-                          setBannerType('error');
-                          setSaveModalMessage(pretty);
-                          setSaveModalVisible(true);
-                        }
-                        return;
-                      }
-                      const trimmed = (editUserName || '').trim();
                       try {
-                        await setUserId(trimmed);
-                        setUserIdState(trimmed);
+                        if (userId) {
+                          await updateProfile(userId, { firstName, lastName, phone: phoneDigits });
+                          await updateAuth({ email, password: editNewPassword || undefined, firstName, lastName, phone: phoneDigits });
+                          setUserName([firstName, lastName].filter(Boolean).join(' '));
+                        }
                         setEditUserModalVisible(false);
                         setBannerType('success');
                         setSaveModalMessage('Usuário atualizado com sucesso.');
                         setSaveModalVisible(true);
                       } catch (e) {
-                        Alert.alert('Erro', 'Falha ao salvar nome do usuário.');
+                        const msg = (e?.message || '').toLowerCase();
+                        const pretty = e?.message || 'Falha ao atualizar usuário.';
+                        setBannerType('error');
+                        setSaveModalMessage(pretty);
+                        setSaveModalVisible(true);
                       }
                     }}
                   >
@@ -1953,6 +1911,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    marginTop: Platform.OS === 'web' ? 0 : 24,
   },
   headerInner: {
     flexDirection: 'row',
@@ -1986,8 +1945,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   headerBtnLogout: {
-    backgroundColor: Platform.OS === 'web' ? '#e53e3e' : undefined,
-    borderColor: Platform.OS === 'web' ? '#e53e3e' : undefined,
+    backgroundColor: '#e53e3e',
+    borderColor: '#e53e3e',
   },
   scrollContent: {
     paddingHorizontal: Platform.OS === 'web' ? 16 : 24,
@@ -2259,7 +2218,7 @@ const styles = StyleSheet.create({
   },
   bannerWrap: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? 12 : 24,
+    top: Platform.OS === 'web' ? 12 : 56,
     left: 0,
     right: 0,
     zIndex: 1000,
