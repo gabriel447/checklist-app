@@ -784,8 +784,21 @@ export default function App() {
         </body>
       </html>`;
 
-      const { uri } = await Print.printToFileAsync({ html });
-      await shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf' });
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          const w = window.open('', '_blank');
+          if (w) {
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
+            w.focus();
+            setTimeout(() => { try { w.print(); } catch {} }, 300);
+          }
+        } catch {}
+      } else {
+        const { uri } = await Print.printToFileAsync({ html });
+        await shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf' });
+      }
     } catch (e) {
       console.error(e);
       Alert.alert('Erro', 'Falha ao gerar/compartilhar PDF.');
@@ -962,8 +975,21 @@ export default function App() {
         </body>
       </html>`;
 
-      const { uri } = await Print.printToFileAsync({ html });
-      await shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf' });
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          const w = window.open('', '_blank');
+          if (w) {
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
+            w.focus();
+            setTimeout(() => { try { w.print(); } catch {} }, 300);
+          }
+        } catch {}
+      } else {
+        const { uri } = await Print.printToFileAsync({ html });
+        await shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf' });
+      }
     } catch (e) {
       console.error(e);
       Alert.alert('Erro', 'Falha ao gerar/compartilhar PDF do item.');
@@ -1567,7 +1593,7 @@ export default function App() {
           <View style={styles.content}>
             <Text style={styles.title}>Checklists</Text>
             {Object.keys(groupedMonths).length === 0 && (
-              <Text style={styles.emptyListText}>Nenhum checklist salvo ainda.</Text>
+              <Text style={styles.emptyListText}>Nenhum checklist para exibir ainda.</Text>
             )}
             {Object.entries(groupedMonths).map(([key, group]) => (
               <Section
@@ -1949,6 +1975,25 @@ export default function App() {
               }}
             >
               <Text style={styles.btnSecondaryText}>Limpar Campos</Text>
+            </Pressable>
+          ) : null}
+
+          {currentId ? (
+            <Pressable
+              style={[styles.btnSecondary, { marginTop: 8 }]}
+              onPress={() => {
+                resetUIForNew();
+                setCurrentId(null);
+                if (Platform.OS === 'web') {
+                  window.history.pushState({}, '', '/home');
+                  setRoute('/home');
+                  setMode('editor');
+                } else {
+                  setMode('editor');
+                }
+              }}
+            >
+              <Text style={styles.btnSecondaryText}>Novo Checklist</Text>
             </Pressable>
           ) : null}
 

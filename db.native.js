@@ -38,6 +38,19 @@ export async function setUserId() {
 }
 
 const toIntBool = (v) => (v === true ? 1 : v === false ? 0 : null);
+const onlyDigits = (s) => String(s || '').replace(/\D+/g, '');
+const formatPhoneBR = (phone) => {
+  const d = onlyDigits(phone);
+  if (!d) return '';
+  const area = d.slice(0, 2);
+  if (d.length >= 11) {
+    return `(${area}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
+  }
+  if (d.length >= 10) {
+    return `(${area}) ${d.slice(2, 6)}-${d.slice(6, 10)}`;
+  }
+  return `(${area}) ${d.slice(2)}`;
+};
 
 export async function listChecklists(userId) {
   const client = getClient();
@@ -210,21 +223,18 @@ export async function signIn({ email, password }) {
     try {
       const { data: existing } = await client
         .from('users')
-        .select('id')
+        .select('id,first_name,last_name,phone,cpf')
         .eq('id', user.id)
         .maybeSingle();
-      if (!existing) {
-        const md = user.user_metadata || {};
-        await client
-          .from('users')
-          .upsert({
-            id: user.id,
-            first_name: md.first_name || '',
-            last_name: md.last_name || '',
-            phone: md.phone || '',
-            cpf: md.cpf || '',
-          });
-      }
+      const md = user.user_metadata || {};
+      const payload = {
+        id: user.id,
+        first_name: (md.first_name ?? existing?.first_name ?? '') || '',
+        last_name: (md.last_name ?? existing?.last_name ?? '') || '',
+        phone: formatPhoneBR(md.phone ?? existing?.phone ?? ''),
+        cpf: onlyDigits(md.cpf ?? existing?.cpf ?? '') || null,
+      };
+      await client.from('users').upsert(payload);
     } catch {}
   }
   return user;
@@ -233,6 +243,8 @@ export async function signIn({ email, password }) {
 export async function signUp({ email, password, firstName, lastName, phone, cpf }) {
   const client = getClient();
   if (!client) return { user: null, session: null, error: 'Supabase não configurado' };
+  const cpfDigits = onlyDigits(cpf);
+  const phoneFmt = formatPhoneBR(phone);
   const { data, error } = await client.auth.signUp({
     email,
     password,
@@ -240,8 +252,8 @@ export async function signUp({ email, password, firstName, lastName, phone, cpf 
       data: {
         first_name: firstName || null,
         last_name: lastName || null,
-        phone: phone || null,
-        cpf: cpf || null,
+        phone: phoneFmt || null,
+        cpf: cpfDigits || null,
         display_name: `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || null,
       },
     },
@@ -269,8 +281,8 @@ export async function signUp({ email, password, firstName, lastName, phone, cpf 
           id: userId,
           first_name: firstName || '',
           last_name: lastName || '',
-          phone: phone || '',
-          cpf: cpf || '',
+          phone: phoneFmt || '',
+          cpf: cpfDigits || null,
         });
       if (upErr) return { user: data?.user || null, session, error: upErr.message };
     } catch (e) {
@@ -297,8 +309,8 @@ export async function updateProfile(userId, { firstName, lastName, phone, cpf })
       id: userId,
       first_name: firstName ?? '',
       last_name: lastName ?? '',
-      phone: phone ?? '',
-      cpf: cpf ?? null,
+      phone: formatPhoneBR(phone ?? ''),
+      cpf: onlyDigits(cpf ?? '') || null,
     });
   if (error) throw new Error(error.message);
   return true;
@@ -307,14 +319,16 @@ export async function updateProfile(userId, { firstName, lastName, phone, cpf })
 export async function updateAuth({ email, password, firstName, lastName, phone, cpf }) {
   const client = getClient();
   if (!client) throw new Error('Supabase não configurado');
+  const cpfDigits = onlyDigits(cpf);
+  const phoneFmt = formatPhoneBR(phone);
   const data = {
     ...(email ? { email } : {}),
     ...(password ? { password } : {}),
     data: {
       ...(firstName ? { first_name: firstName } : {}),
       ...(lastName ? { last_name: lastName } : {}),
-      ...(phone ? { phone } : {}),
-      ...(cpf ? { cpf } : {}),
+      ...(phoneFmt ? { phone: phoneFmt } : {}),
+      ...(cpfDigits ? { cpf: cpfDigits } : {}),
       display_name: `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim() || null,
     },
   };
