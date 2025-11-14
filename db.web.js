@@ -137,14 +137,14 @@ export async function signIn({ email, password }) {
   if (user) {
     try {
       const { data: existing } = await client
-        .from('profiles')
+        .from('users')
         .select('id')
         .eq('id', user.id)
         .maybeSingle();
       if (!existing) {
         const md = user.user_metadata || {};
         await client
-          .from('profiles')
+          .from('users')
           .upsert({
             id: user.id,
             first_name: md.first_name || '',
@@ -187,7 +187,7 @@ export async function signUp({ email, password, firstName, lastName, phone }) {
   if (userId && session) {
     try {
       await client
-        .from('profiles')
+        .from('users')
         .upsert({
           id: userId,
           first_name: firstName || '',
@@ -211,7 +211,7 @@ export async function getProfile(userId) {
   const client = getClient();
   if (!client) return null;
   const { data } = await client
-    .from('profiles')
+    .from('users')
     .select('first_name,last_name,phone')
     .eq('id', userId)
     .maybeSingle();
