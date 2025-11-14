@@ -92,8 +92,18 @@ const isValidEmail = (s) => {
   const e = s.trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 };
-
-
+const isValidUrl = (s) => {
+  try {
+    const u = new URL((s || '').trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+const isUuid = (s) => {
+  const v = (s || '').trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+};
 const Section = ({ title, children, expanded, onToggle }) => (
   <View style={styles.section}>
     <Pressable onPress={onToggle} style={styles.sectionHeader}>
@@ -128,7 +138,6 @@ export default function App() {
 
   const [form, setForm] = useState(makeInitialForm());
   const [originalForm, setOriginalForm] = useState(makeInitialForm());
-
   const [mode, setMode] = useState(initialModeWeb);
   const [authMode, setAuthMode] = useState('login');
   const [authEmail, setAuthEmail] = useState('');
@@ -168,6 +177,7 @@ export default function App() {
   const [locatingKey, setLocatingKey] = useState(null);
   const [isNavigatingList, setIsNavigatingList] = useState(false);
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const locClienteRef = useRef(null);
   const locCtoRef = useRef(null);
   const locCasaRef = useRef(null);
@@ -481,13 +491,47 @@ export default function App() {
 
   const onSave = async () => {
     try {
+      setIsSaving(true);
+      if (Platform.OS === 'web') {
+        const ready = typeof isSupabaseReady === 'function' ? isSupabaseReady() : true;
+        if (!ready) {
+          setBannerType('error');
+          setSaveModalMessage('Supabase não configurado. Defina EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_KEY.');
+          setSaveModalVisible(true);
+          return;
+        }
+      }
+      if (!currentId) {
+        const s = (v) => (v || '').trim();
+        if (!s(form.nome)) {
+          setBannerType('warn');
+          setSaveModalMessage('Informe pelo menos o nome completo.');
+          setSaveModalVisible(true);
+          setExpanded((e) => ({ ...e, cliente: true }));
+          return;
+        }
+        const links = [form.locClienteLink, form.locCtoLink, form.locCasaLink].filter((v) => !!s(v));
+        const someInvalid = links.some((v) => !isValidUrl(v));
+        if (someInvalid) {
+          setBannerType('warn');
+          setSaveModalMessage('Links devem ser URLs válidas (http/https).');
+          setSaveModalVisible(true);
+          setExpanded((e) => ({ ...e, cliente: true, cto: true, casa: true }));
+          return;
+        }
+      }
       const prevShow = showWifiPassword;
-      setShowWifiPassword(true);
       senhaWifiRef.current?.blur();
       await new Promise((r) => setTimeout(r, 50));
-      if (!userId) return;
+      const useUserId = isUuid(userId) ? userId : null;
       if (!currentId) {
-        const id = await saveChecklist(form, userId);
+        const id = await saveChecklist(form, useUserId);
+        if (!id) {
+          setBannerType('error');
+          setSaveModalMessage('Falha ao criar checklist.');
+          setSaveModalVisible(true);
+          return;
+        }
         setCurrentId(id);
         setOriginalForm(form);
         setSaveModalMessage('Checklist criado com sucesso.');
@@ -500,10 +544,14 @@ export default function App() {
         setSaveModalVisible(true);
       }
       await refreshList();
-      setShowWifiPassword(prevShow);
     } catch (e) {
       console.error(e);
-      Alert.alert('Erro', 'Não foi possível salvar.');
+      setBannerType('error');
+      const msg = (e && (e.message || e.error_description || e.hint)) ? (e.message || e.error_description || e.hint) : 'Não foi possível salvar. Verifique conexão e configuração do Supabase.';
+      setSaveModalMessage(msg);
+      setSaveModalVisible(true);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -773,25 +821,40 @@ export default function App() {
       if (!row) return;
       const loaded = {
         nome: row.nome || '',
-        ruaNumero: row.ruaNumero || '',
-        locClienteLink: row.locClienteLink || '',
-        locCtoLink: row.locCtoLink || '',
-        fotoCto: row.fotoCto || null,
-        fotoCtoDataUri: row.fotoCtoDataUri || null,
-        corFibra: row.corFibra || '',
-        possuiSplitter: row.possuiSplitter === 1 ? true : row.possuiSplitter === 0 ? false : null,
-        portaCliente: row.portaCliente || '',
-        locCasaLink: row.locCasaLink || '',
-        fotoFrenteCasa: row.fotoFrenteCasa || null,
-        fotoFrenteCasaDataUri: row.fotoFrenteCasaDataUri || null,
-        fotoInstalacao: row.fotoInstalacao || null,
-        fotoInstalacaoDataUri: row.fotoInstalacaoDataUri || null,
-        fotoMacEquip: row.fotoMacEquip || null,
-        fotoMacEquipDataUri: row.fotoMacEquipDataUri || null,
-        nomeWifi: row.nomeWifi || '',
-        senhaWifi: row.senhaWifi || '',
-        testeNavegacaoOk: row.testeNavegacaoOk === 1 ? true : row.testeNavegacaoOk === 0 ? false : null,
-        clienteSatisfeito: row.clienteSatisfeito === 1 ? true : row.clienteSatisfeito === 0 ? false : null,
+        ruaNumero: row.ruaNumero || row.ruanumero || '',
+        locClienteLink: row.locClienteLink || row.locclientelink || '',
+        locCtoLink: row.locCtoLink || row.locctolink || '',
+        fotoCto: row.fotoCto || row.fotocto || null,
+        fotoCtoDataUri: row.fotoCtoDataUri || row.fotoctodatauri || null,
+        corFibra: row.corFibra || row.corfibra || '',
+        possuiSplitter:
+          row.possuiSplitter === 1 || row.possuisplitter === 1
+            ? true
+            : row.possuiSplitter === 0 || row.possuisplitter === 0
+            ? false
+            : null,
+        portaCliente: row.portaCliente || row.portacliente || '',
+        locCasaLink: row.locCasaLink || row.loccasalink || '',
+        fotoFrenteCasa: row.fotoFrenteCasa || row.fotofrentecasa || null,
+        fotoFrenteCasaDataUri: row.fotoFrenteCasaDataUri || row.fotofrentecasadatauri || null,
+        fotoInstalacao: row.fotoInstalacao || row.fotoinstalacao || null,
+        fotoInstalacaoDataUri: row.fotoInstalacaoDataUri || row.fotoinstalacaodatauri || null,
+        fotoMacEquip: row.fotoMacEquip || row.fotomacequip || null,
+        fotoMacEquipDataUri: row.fotoMacEquipDataUri || row.fotomacequipdatauri || null,
+        nomeWifi: row.nomeWifi || row.nomewifi || '',
+        senhaWifi: row.senhaWifi || row.senhawifi || '',
+        testeNavegacaoOk:
+          row.testeNavegacaoOk === 1 || row.testenavegacaook === 1
+            ? true
+            : row.testeNavegacaoOk === 0 || row.testenavegacaook === 0
+            ? false
+            : null,
+        clienteSatisfeito:
+          row.clienteSatisfeito === 1 || row.clientesatisfeito === 1
+            ? true
+            : row.clienteSatisfeito === 0 || row.clientesatisfeito === 0
+            ? false
+            : null,
       };
       setForm(loaded);
       setOriginalForm(loaded);
@@ -954,7 +1017,7 @@ export default function App() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Confirmar exclusão</Text>
             <Text style={styles.modalText}>Deseja deletar este checklist?</Text>
-            <View style={styles.row}>
+            <View style={[styles.row, { marginTop: 12 }]}>
               <Pressable style={[styles.btnSecondary, { flex: 1 }]} onPress={() => setDeleteModalVisible(false)}>
                 <Text style={styles.btnSecondaryText}>Cancelar</Text>
               </Pressable>
@@ -1689,20 +1752,46 @@ export default function App() {
               style={[
                 styles.btn,
                 { flex: 1 },
-                (currentId ? !hasChanges : !createReady) && styles.btnDisabled,
+                isSaving && styles.btnDisabled,
               ]}
               onPress={onSave}
-              disabled={currentId ? !hasChanges : !createReady}
+              disabled={isSaving}
             >
-              <Text style={styles.btnText}>{actionLabel}</Text>
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.btnText}>{actionLabel}</Text>
+              )}
             </Pressable>
           </View>
 
+          <Pressable
+            style={[styles.btnSecondary, { marginTop: 8 }]}
+            onPress={() => {
+              resetUIForNew();
+              setCurrentId(null);
+              if (Platform.OS === 'web') {
+                window.history.pushState({}, '', '/home');
+                setRoute('/home');
+                setMode('editor');
+              } else {
+                setMode('editor');
+              }
+            }}
+          >
+            <Text style={styles.btnSecondaryText}>Novo Checklist</Text>
+          </Pressable>
+
           {currentId ? (
-            <Pressable style={[styles.btn, { marginTop: 8 }]} onPress={onExportPdf}>
-              <Text style={styles.btnText}>Exportar PDF</Text>
+            <Pressable
+              style={[styles.btnDanger, { marginTop: 8 }]}
+              onPress={() => onDeleteRequest(currentId)}
+            >
+              <Text style={styles.btnText}>Deletar Checklist</Text>
             </Pressable>
           ) : null}
+
+          {null}
 
           <View style={{ height: 24 }} />
         </View>
@@ -1812,6 +1901,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 12,
     color: '#222',
+  },
+  modalText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 8,
   },
   section: {
     backgroundColor: '#fff',

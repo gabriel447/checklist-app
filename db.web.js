@@ -51,35 +51,36 @@ export async function saveChecklist(data, userId) {
   if (!client) throw new Error('Supabase não configurado');
   const nowISO = new Date().toISOString();
   const payload = {
-    user_id: userId,
+    user_id: userId || null,
     created_at: nowISO,
     updated_at: nowISO,
     nome: data.nome || '',
     ruaNumero: data.ruaNumero || '',
     locClienteLink: data.locClienteLink || '',
     locCtoLink: data.locCtoLink || '',
-    fotoCto: data.fotoCto || null,
-    fotoCtoDataUri: data.fotoCtoDataUri || null,
-    corFibra: data.corFibra || '',
-    possuiSplitter: toIntBool(data.possuiSplitter),
+    fotocto: data.fotoCto || null,
+    fotoctodatauri: data.fotoCtoDataUri || null,
+    corfibra: data.corFibra || '',
+    possuisplitter: toIntBool(data.possuiSplitter),
     portaCliente: data.portaCliente || '',
     locCasaLink: data.locCasaLink || '',
-    fotoFrenteCasa: data.fotoFrenteCasa || null,
-    fotoFrenteCasaDataUri: data.fotoFrenteCasaDataUri || null,
-    fotoInstalacao: data.fotoInstalacao || null,
-    fotoInstalacaoDataUri: data.fotoInstalacaoDataUri || null,
-    fotoMacEquip: data.fotoMacEquip || null,
-    fotoMacEquipDataUri: data.fotoMacEquipDataUri || null,
-    nomeWifi: data.nomeWifi || '',
-    senhaWifi: data.senhaWifi || '',
-    testeNavegacaoOk: toIntBool(data.testeNavegacaoOk),
-    clienteSatisfeito: toIntBool(data.clienteSatisfeito),
+    fotofrentecasa: data.fotoFrenteCasa || null,
+    fotofrentecasadatauri: data.fotoFrenteCasaDataUri || null,
+    fotoinstalacao: data.fotoInstalacao || null,
+    fotoinstalacaodatauri: data.fotoInstalacaoDataUri || null,
+    fotomacequip: data.fotoMacEquip || null,
+    fotomacequipdatauri: data.fotoMacEquipDataUri || null,
+    nomewifi: data.nomeWifi || '',
+    senhawifi: data.senhaWifi || '',
+    testenavegacaook: toIntBool(data.testeNavegacaoOk),
+    clientesatisfeito: toIntBool(data.clienteSatisfeito),
   };
-  const { data: inserted } = await client
+  const { data: inserted, error } = await client
     .from('checklists')
     .insert(payload)
     .select('id')
     .single();
+  if (error) throw error;
   return inserted?.id;
 }
 
@@ -93,24 +94,25 @@ export async function updateChecklist(id, data) {
     ruaNumero: data.ruaNumero || '',
     locClienteLink: data.locClienteLink || '',
     locCtoLink: data.locCtoLink || '',
-    fotoCto: data.fotoCto || null,
-    fotoCtoDataUri: data.fotoCtoDataUri || null,
-    corFibra: data.corFibra || '',
-    possuiSplitter: toIntBool(data.possuiSplitter),
+    fotocto: data.fotoCto || null,
+    fotoctodatauri: data.fotoCtoDataUri || null,
+    corfibra: data.corFibra || '',
+    possuisplitter: toIntBool(data.possuiSplitter),
     portaCliente: data.portaCliente || '',
     locCasaLink: data.locCasaLink || '',
-    fotoFrenteCasa: data.fotoFrenteCasa || null,
-    fotoFrenteCasaDataUri: data.fotoFrenteCasaDataUri || null,
-    fotoInstalacao: data.fotoInstalacao || null,
-    fotoInstalacaoDataUri: data.fotoInstalacaoDataUri || null,
-    fotoMacEquip: data.fotoMacEquip || null,
-    fotoMacEquipDataUri: data.fotoMacEquipDataUri || null,
-    nomeWifi: data.nomeWifi || '',
-    senhaWifi: data.senhaWifi || '',
-    testeNavegacaoOk: toIntBool(data.testeNavegacaoOk),
-    clienteSatisfeito: toIntBool(data.clienteSatisfeito),
+    fotofrentecasa: data.fotoFrenteCasa || null,
+    fotofrentecasadatauri: data.fotoFrenteCasaDataUri || null,
+    fotoinstalacao: data.fotoInstalacao || null,
+    fotoinstalacaodatauri: data.fotoInstalacaoDataUri || null,
+    fotomacequip: data.fotoMacEquip || null,
+    fotomacequipdatauri: data.fotoMacEquipDataUri || null,
+    nomewifi: data.nomeWifi || '',
+    senhawifi: data.senhaWifi || '',
+    testenavegacaook: toIntBool(data.testeNavegacaoOk),
+    clientesatisfeito: toIntBool(data.clienteSatisfeito),
   };
-  await client.from('checklists').update(payload).eq('id', id);
+  const { error } = await client.from('checklists').update(payload).eq('id', id);
+  if (error) throw error;
   return true;
 }
 
