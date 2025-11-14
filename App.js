@@ -1851,22 +1851,24 @@ export default function App() {
             </Pressable>
           </View>
 
-          <Pressable
-            style={[styles.btnSecondary, { marginTop: 8 }]}
-            onPress={() => {
-              resetUIForNew();
-              setCurrentId(null);
-              if (Platform.OS === 'web') {
-                window.history.pushState({}, '', '/home');
-                setRoute('/home');
-                setMode('editor');
-              } else {
-                setMode('editor');
-              }
-            }}
-          >
-            <Text style={styles.btnSecondaryText}>Novo Checklist</Text>
-          </Pressable>
+          {currentId ? (
+            <Pressable
+              style={[styles.btnSecondary, { marginTop: 8 }]}
+              onPress={() => {
+                resetUIForNew();
+                setCurrentId(null);
+                if (Platform.OS === 'web') {
+                  window.history.pushState({}, '', '/home');
+                  setRoute('/home');
+                  setMode('editor');
+                } else {
+                  setMode('editor');
+                }
+              }}
+            >
+              <Text style={styles.btnSecondaryText}>Novo Checklist</Text>
+            </Pressable>
+          ) : null}
 
           {currentId ? (
             <Pressable
@@ -2218,7 +2220,7 @@ const styles = StyleSheet.create({
   },
   bannerWrap: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? 12 : 56,
+    top: Platform.OS === 'web' ? 12 : 60,
     left: 0,
     right: 0,
     zIndex: 1000,
