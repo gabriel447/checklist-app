@@ -144,6 +144,10 @@ export default function App() {
   const [isLocating, setIsLocating] = useState(false);
   const [locatingKey, setLocatingKey] = useState(null);
   const [isNavigatingList, setIsNavigatingList] = useState(false);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const locClienteRef = useRef(null);
+  const locCtoRef = useRef(null);
+  const locCasaRef = useRef(null);
 
 
   const clearAuthFields = () => {
@@ -321,51 +325,103 @@ export default function App() {
   const useCurrentLocation = async (fieldKey) => {
     setIsLocating(true);
     setLocatingKey(fieldKey);
-    if (
-      Platform.OS === 'web' &&
-      typeof navigator !== 'undefined' &&
-      navigator.geolocation
-    ) {
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
       try {
-        const opts = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+        if (navigator.permissions && navigator.permissions.query) {
+          try {
+            const p = await navigator.permissions.query({ name: 'geolocation' });
+            if (p.state === 'denied') {
+              setBannerType('error');
+              setSaveModalMessage('Permissão de localização negada no navegador. Ative e tente novamente.');
+              setSaveModalVisible(true);
+              setIsLocating(false);
+              setLocatingKey(null);
+              return;
+            }
+          } catch {}
+        }
+        const opts = { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 };
         let pos = await new Promise((resolve, reject) =>
           navigator.geolocation.getCurrentPosition(resolve, reject, opts)
         );
-        const { latitude, longitude } = pos.coords;
+        let best = pos;
+        const acc = best?.coords?.accuracy;
+        if (typeof acc === 'number' && acc > 30) {
+          try {
+            await new Promise((resolve) => {
+              let done = false;
+              const id = navigator.geolocation.watchPosition(
+                (p) => {
+                  if (!best || (p?.coords?.accuracy || Infinity) < (best?.coords?.accuracy || Infinity)) {
+                    best = p;
+                  }
+                  if (p?.coords?.accuracy && p.coords.accuracy <= 20) {
+                    navigator.geolocation.clearWatch(id);
+                    done = true;
+                    resolve(null);
+                  }
+                },
+                () => {},
+                { enableHighAccuracy: true, maximumAge: 0 }
+              );
+              setTimeout(() => { if (!done) { navigator.geolocation.clearWatch(id); resolve(null); } }, 15000);
+            });
+          } catch {}
+        }
+        const { latitude, longitude } = best.coords;
         const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
         setField(fieldKey, link);
         setIsLocating(false);
         setLocatingKey(null);
         return;
       } catch (e) {
-        if (e && e.code === 3) {
-          try {
-            const opts = { enableHighAccuracy: true, maximumAge: 0 };
-            const pos = await new Promise((resolve, reject) => {
-              const id = navigator.geolocation.watchPosition(
-                (p) => {
-                  navigator.geolocation.clearWatch(id);
-                  resolve(p);
-                },
-                (err) => {
-                  navigator.geolocation.clearWatch(id);
-                  reject(err);
-                },
-                opts
-              );
-              setTimeout(() => {
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            const id = navigator.geolocation.watchPosition(
+              (p) => {
                 navigator.geolocation.clearWatch(id);
-                reject({ code: 3 });
-              }, 10000);
-            });
-            const { latitude, longitude } = pos.coords;
-            const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                resolve(p);
+              },
+              (err) => {
+                navigator.geolocation.clearWatch(id);
+                reject(err);
+              },
+              { enableHighAccuracy: true, maximumAge: 0 }
+            );
+            setTimeout(() => {
+              navigator.geolocation.clearWatch(id);
+              reject({ code: 3 });
+            }, 20000);
+          });
+          const { latitude, longitude } = pos.coords;
+          const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
+          setField(fieldKey, link);
+          setIsLocating(false);
+          setLocatingKey(null);
+          return;
+        } catch {}
+        try {
+          const r = await fetch('https://ipapi.co/json/');
+          const j = await r.json();
+          if (j && typeof j.latitude === 'number' && typeof j.longitude === 'number') {
+            const link = `https://www.google.com/maps?q=${j.latitude},${j.longitude}`;
             setField(fieldKey, link);
             setIsLocating(false);
             setLocatingKey(null);
             return;
-          } catch {}
-        }
+          }
+        } catch {}
+        try {
+          const r2 = await fetch('https://get.geojs.io/v1/ip/geo.json');
+          const j2 = await r2.json();
+          if (j2 && j2.latitude && j2.longitude) {
+            const link = `https://www.google.com/maps?q=${j2.latitude},${j2.longitude}`;
+            setField(fieldKey, link);
+            setIsLocating(false);
+            setLocatingKey(null);
+            return;
+          }
+        } catch {}
         const msg = e && e.code === 1
           ? 'Permissão de localização negada no navegador.'
           : e && e.code === 2
@@ -391,7 +447,7 @@ export default function App() {
       }
       let pos = null;
       try {
-        pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
       } catch (e) {
         pos = await Location.getLastKnownPositionAsync();
       }
@@ -400,7 +456,7 @@ export default function App() {
         try {
           let resolved = false;
           const sub = await Location.watchPositionAsync(
-            { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 0 },
+            { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1500, distanceInterval: 0 },
             (p) => {
               if (!resolved && p && p.coords) {
                 resolved = true;
@@ -409,7 +465,7 @@ export default function App() {
               }
             }
           );
-          await new Promise((r) => setTimeout(r, 10000));
+          await new Promise((r) => setTimeout(r, 20000));
           if (!resolved) sub.remove();
         } catch {}
         if (!got || !got.coords) {
@@ -498,6 +554,24 @@ export default function App() {
       Alert.alert('Erro', 'Não foi possível salvar.');
     }
   };
+
+  const createReady = useMemo(() => {
+    const s = (v) => (v || '').trim();
+    return (
+      s(form.nome) &&
+      s(form.ruaNumero) &&
+      s(form.locClienteLink) &&
+      s(form.locCtoLink) &&
+      s(form.locCasaLink) &&
+      s(form.corFibra) &&
+      form.possuiSplitter !== null &&
+      s(form.portaCliente) &&
+      s(form.nomeWifi) &&
+      s(form.senhaWifi) &&
+      form.testeNavegacaoOk !== null &&
+      form.clienteSatisfeito !== null
+    );
+  }, [form]);
 
   const onExportPdf = async () => {
     try {
@@ -821,7 +895,7 @@ export default function App() {
             <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{userName || userId || '—'}</Text>
           </Pressable>
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 8, marginLeft: 8 }}>
           {effectiveMode !== 'auth' ? (
             <>
               {effectiveMode === 'editor' ? (
@@ -829,7 +903,7 @@ export default function App() {
                   {isNavigatingList ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.headerBtnText}>Ver checklists</Text>
+                    <Text style={styles.headerBtnText}>Checklists</Text>
                   )}
                 </Pressable>
               ) : (
@@ -913,6 +987,7 @@ export default function App() {
             <TextInput
               style={styles.input}
               placeholder="Nome do usuário"
+              placeholderTextColor="#9aa0b5"
               value={editUserName}
               onChangeText={setEditUserName}
               maxLength={60}
@@ -1050,7 +1125,8 @@ export default function App() {
               return (
             <View style={styles.row}>
               {authMode === 'login' ? (
-                <Pressable style={[styles.btn, !loginReady && styles.btnDisabled, { flex: 1 }]} disabled={!loginReady} onPress={async () => {
+                <Pressable style={[styles.btn, (!loginReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!loginReady || isAuthSubmitting} onPress={async () => {
+                  setIsAuthSubmitting(true);
                   try {
                     const email = authEmail.trim();
                     if (!isValidEmail(email)) { return; }
@@ -1084,12 +1160,17 @@ export default function App() {
                     setBannerType('error');
                     setSaveModalMessage('Não foi possível fazer login.');
                     setSaveModalVisible(true);
-                  }
+                  } finally { setIsAuthSubmitting(false); }
                 }}>
-                  <Text style={styles.btnText}>Entrar</Text>
+                  {isAuthSubmitting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.btnText}>Entrar</Text>
+                  )}
                 </Pressable>
               ) : (
-                <Pressable style={[styles.btn, !registerReady && styles.btnDisabled, { flex: 1 }]} disabled={!registerReady} onPress={async () => {
+                <Pressable style={[styles.btn, (!registerReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!registerReady || isAuthSubmitting} onPress={async () => {
+                  setIsAuthSubmitting(true);
                   try {
                     const digits = (authPhone || '').replace(/\D+/g, '');
                     if (!authFirstName || !authLastName || !authEmail || !authPassword || digits.length !== 11) { return; }
@@ -1131,9 +1212,13 @@ export default function App() {
                     setBannerType('error');
                     setSaveModalMessage('Não foi possível cadastrar.');
                     setSaveModalVisible(true);
-                  }
+                  } finally { setIsAuthSubmitting(false); }
                 }}>
-                  <Text style={styles.btnText}>Cadastrar</Text>
+                  {isAuthSubmitting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.btnText}>Cadastrar</Text>
+                  )}
                 </Pressable>
               )}
             </View>
@@ -1206,6 +1291,7 @@ export default function App() {
             <TextInput
               style={styles.input}
               placeholder="Nome completo"
+              placeholderTextColor="#9aa0b5"
               value={form.nome}
               onChangeText={(t) => setField('nome', toTitleCase(t.replace(/[^A-Za-zÀ-ÿ\s'\-]/g, '')))}
               maxLength={50}
@@ -1220,6 +1306,7 @@ export default function App() {
             <TextInput
               style={styles.input}
               placeholder="Rua e número"
+              placeholderTextColor="#9aa0b5"
               value={form.ruaNumero}
               onChangeText={(t) => setField('ruaNumero', toTitleCase(t))}
               maxLength={50}
@@ -1227,20 +1314,38 @@ export default function App() {
 
             <Text style={styles.label}>📍 Localização (link do Maps)</Text>
             <View style={styles.row}>
-              <TextInput
-                style={[styles.input, styles.inputInline, { flex: 1 }]}
-                placeholder="https://www.google.com/maps?..."
-                value={form.locClienteLink}
-                onChangeText={(t) => setField('locClienteLink', t)}
-                autoCapitalize="none"
-                autoCorrect={false}
-                spellCheck={false}
-              />
+              <View style={{ flex: 1 }} pointerEvents={Platform.OS === 'web' ? 'none' : 'auto'}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.inputInline,
+                    { flex: 1 },
+                  form.locClienteLink ? styles.inputLinkReady : null,
+                  ]}
+                  placeholder="https://www.google.com/maps?..."
+                  placeholderTextColor="#9aa0b5"
+                  value={form.locClienteLink}
+                  onChangeText={() => {}}
+                  editable={false}
+                  caretHidden
+                  ref={locClienteRef}
+                  onFocus={() => {
+                    try { locClienteRef.current?.blur(); } catch {}
+                    if (Platform.OS === 'web' && form.locClienteLink) {
+                      const ok = window.confirm('Abrir o link no Google Maps?');
+                      if (ok) { window.open(form.locClienteLink, '_blank', 'noopener,noreferrer'); }
+                    }
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                />
+              </View>
               <Pressable style={[styles.btn, styles.btnInline]} onPress={() => useCurrentLocation('locClienteLink')} disabled={isLocating}>
                 {isLocating && locatingKey === 'locClienteLink' ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.btnText}>Puxar localização</Text>
+                  <Text style={styles.btnText}>Puxar Localização</Text>
                 )}
               </Pressable>
             </View>
@@ -1254,20 +1359,38 @@ export default function App() {
           >
             <Text style={styles.label}>📍 Localização da CTO (link do Maps)</Text>
             <View style={styles.row}>
-              <TextInput
-                style={[styles.input, styles.inputInline, { flex: 1 }]}
-                placeholder="https://www.google.com/maps?..."
-                value={form.locCtoLink}
-                onChangeText={(t) => setField('locCtoLink', t)}
-                autoCapitalize="none"
-                autoCorrect={false}
-                spellCheck={false}
-              />
+              <View style={{ flex: 1 }} pointerEvents={Platform.OS === 'web' ? 'none' : 'auto'}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.inputInline,
+                    { flex: 1 },
+                    form.locCtoLink ? styles.inputLinkReady : null,
+                  ]}
+                  placeholder="https://www.google.com/maps?..."
+                  placeholderTextColor="#9aa0b5"
+                  value={form.locCtoLink}
+                  onChangeText={() => {}}
+                  editable={false}
+                  caretHidden
+                  ref={locCtoRef}
+                  onFocus={() => {
+                    try { locCtoRef.current?.blur(); } catch {}
+                    if (Platform.OS === 'web' && form.locCtoLink) {
+                      const ok = window.confirm('Abrir o link no Google Maps?');
+                      if (ok) { window.open(form.locCtoLink, '_blank', 'noopener,noreferrer'); }
+                    }
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                />
+              </View>
               <Pressable style={[styles.btn, styles.btnInline]} onPress={() => useCurrentLocation('locCtoLink')} disabled={isLocating}>
                 {isLocating && locatingKey === 'locCtoLink' ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.btnText}>Puxar localização</Text>
+                  <Text style={styles.btnText}>Puxar Localização</Text>
                 )}
               </Pressable>
             </View>
@@ -1289,6 +1412,7 @@ export default function App() {
             <TextInput
               style={styles.input}
               placeholder="Ex.: Amarela, Azul..."
+              placeholderTextColor="#9aa0b5"
               value={form.corFibra}
               onChangeText={(t) => setField('corFibra', toTitleCase(t.replace(/[^A-Za-zÀ-ÿ\s'\-]/g, '')))}
               maxLength={20}
@@ -1306,6 +1430,7 @@ export default function App() {
             <TextInput
               style={styles.input}
               placeholder="Porta"
+              placeholderTextColor="#9aa0b5"
               value={form.portaCliente}
               onChangeText={(t) => setField('portaCliente', t.replace(/[^0-9]/g, ''))}
               keyboardType="number-pad"
@@ -1321,20 +1446,38 @@ export default function App() {
           >
             <Text style={styles.label}>📍 Localização da casa (link do Maps)</Text>
             <View style={styles.row}>
-              <TextInput
-                style={[styles.input, styles.inputInline, { flex: 1 }]}
-                placeholder="https://www.google.com/maps?..."
-                value={form.locCasaLink}
-                onChangeText={(t) => setField('locCasaLink', t)}
-                autoCapitalize="none"
-                autoCorrect={false}
-                spellCheck={false}
-              />
+              <View style={{ flex: 1 }} pointerEvents={Platform.OS === 'web' ? 'none' : 'auto'}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.inputInline,
+                    { flex: 1 },
+                    form.locCasaLink ? styles.inputLinkReady : null,
+                  ]}
+                  placeholder="https://www.google.com/maps?..."
+                  placeholderTextColor="#9aa0b5"
+                  value={form.locCasaLink}
+                  onChangeText={() => {}}
+                  editable={false}
+                  caretHidden
+                  ref={locCasaRef}
+                  onFocus={() => {
+                    try { locCasaRef.current?.blur(); } catch {}
+                    if (Platform.OS === 'web' && form.locCasaLink) {
+                      const ok = window.confirm('Abrir o link no Google Maps?');
+                      if (ok) { window.open(form.locCasaLink, '_blank', 'noopener,noreferrer'); }
+                    }
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                />
+              </View>
               <Pressable style={[styles.btn, styles.btnInline]} onPress={() => useCurrentLocation('locCasaLink')} disabled={isLocating}>
                 {isLocating && locatingKey === 'locCasaLink' ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.btnText}>Puxar localização</Text>
+                  <Text style={styles.btnText}>Puxar Localização</Text>
                 )}
               </Pressable>
             </View>
@@ -1389,6 +1532,7 @@ export default function App() {
             <TextInput
               style={styles.input}
               placeholder="SSID"
+              placeholderTextColor="#9aa0b5"
               value={form.nomeWifi}
               onChangeText={(t) => setField('nomeWifi', t)}
               autoComplete="off"
@@ -1401,19 +1545,20 @@ export default function App() {
 
             <Text style={styles.label}>🔑 Senha do Wi-Fi</Text>
             <View style={styles.inputWrapper}>
-              <TextInput
-                style={[styles.input, styles.inputWithIcon]}
-                placeholder="Senha"
-                secureTextEntry={!showWifiPassword}
-                value={form.senhaWifi}
-                onChangeText={(t) => setField('senhaWifi', t)}
-                autoComplete="off"
-                textContentType="oneTimeCode"
-                autoCorrect={false}
-                spellCheck={false}
-                ref={senhaWifiRef}
-                maxLength={32}
-              />
+            <TextInput
+              style={[styles.input, styles.inputWithIcon]}
+              placeholder="Senha"
+              placeholderTextColor="#9aa0b5"
+              secureTextEntry={!showWifiPassword}
+              value={form.senhaWifi}
+              onChangeText={(t) => setField('senhaWifi', t)}
+              autoComplete="off"
+              textContentType="oneTimeCode"
+              autoCorrect={false}
+              spellCheck={false}
+              ref={senhaWifiRef}
+              maxLength={32}
+            />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={showWifiPassword ? 'Ocultar senha' : 'Mostrar senha'}
@@ -1441,9 +1586,13 @@ export default function App() {
           <View style={{ height: 8 }} />
           <View style={styles.row}>
             <Pressable
-              style={[styles.btn, { flex: 1 }, !hasChanges && styles.btnDisabled]}
+              style={[
+                styles.btn,
+                { flex: 1 },
+                (currentId ? !hasChanges : !createReady) && styles.btnDisabled,
+              ]}
               onPress={onSave}
-              disabled={!hasChanges}
+              disabled={currentId ? !hasChanges : !createReady}
             >
               <Text style={styles.btnText}>{actionLabel}</Text>
             </Pressable>
@@ -1587,22 +1736,35 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 2,
   },
+  labelMuted: {
+    color: '#9aa0b5',
+  },
   input: {
     backgroundColor: '#f7f8fc',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'web' ? 8 : 10,
-    fontSize: Platform.OS === 'web' ? 13 : 14,
+    paddingVertical: Platform.OS === 'web' ? 10 : 10,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
     color: '#222',
     marginBottom: 10,
   },
   inputInline: {
     marginBottom: 0,
-    height: Platform.OS === 'web' ? 36 : 38,
-    paddingVertical: Platform.OS === 'web' ? 6 : 8,
+    height: Platform.OS === 'web' ? 40 : 38,
+    paddingVertical: Platform.OS === 'web' ? 8 : 8,
+  },
+  inputDisabled: {
+    opacity: 0.6,
+  },
+  inputEmpty: {
+    backgroundColor: '#eef2ff',
   },
   inputWithIcon: {
     paddingRight: 48,
+  },
+  inputLinkReady: {
+    color: '#1e40af',
+    fontWeight: '600',
   },
   row: {
     flexDirection: 'row',
@@ -1618,7 +1780,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 12,
     top: '50%',
-    transform: [{ translateY: -14 }],
+    transform: [{ translateY: -16 }],
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
@@ -1634,10 +1796,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   btnInline: {
-    height: 38,
-    paddingVertical: 0,
+    height: 40,
+    paddingVertical: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 12,
+    minWidth: 110,
+    flexShrink: 0,
   },
   btnText: {
     color: '#fff',
