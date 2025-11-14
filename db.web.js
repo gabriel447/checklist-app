@@ -29,20 +29,28 @@ export async function setUserId() {
 
 const toIntBool = (v) => (v === true ? 1 : v === false ? 0 : null);
 
-export async function listChecklists() {
+export async function listChecklists(userId) {
   const client = getClient();
   if (!client) return [];
+  if (!userId) return [];
   const { data } = await client
     .from('checklists')
     .select('id,nome,created_at,updated_at')
+    .eq('user_id', userId)
     .order('created_at', { ascending: false });
   return data || [];
 }
 
-export async function getChecklist(id) {
+export async function getChecklist(id, userId) {
   const client = getClient();
   if (!client) return null;
-  const { data } = await client.from('checklists').select('*').eq('id', id).maybeSingle();
+  if (!userId) return null;
+  const { data } = await client
+    .from('checklists')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
   return data || null;
 }
 
@@ -84,9 +92,10 @@ export async function saveChecklist(data, userId) {
   return inserted?.id;
 }
 
-export async function updateChecklist(id, data) {
+export async function updateChecklist(id, data, userId) {
   const client = getClient();
   if (!client) throw new Error('Supabase não configurado');
+  if (!userId) throw new Error('Usuário inválido');
   const nowISO = new Date().toISOString();
   const payload = {
     updated_at: nowISO,
@@ -111,15 +120,24 @@ export async function updateChecklist(id, data) {
     testenavegacaook: toIntBool(data.testeNavegacaoOk),
     clientesatisfeito: toIntBool(data.clienteSatisfeito),
   };
-  const { error } = await client.from('checklists').update(payload).eq('id', id);
+  const { error } = await client
+    .from('checklists')
+    .update(payload)
+    .eq('id', id)
+    .eq('user_id', userId);
   if (error) throw error;
   return true;
 }
 
-export async function deleteChecklist(id) {
+export async function deleteChecklist(id, userId) {
   const client = getClient();
   if (!client) throw new Error('Supabase não configurado');
-  await client.from('checklists').delete().eq('id', id);
+  if (!userId) throw new Error('Usuário inválido');
+  await client
+    .from('checklists')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
   return true;
 }
 

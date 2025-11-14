@@ -365,7 +365,7 @@ export default function App() {
   }, [userId, route, loading]);
 
   const refreshList = async () => {
-    const rows = await listChecklists();
+    const rows = await listChecklists(userId);
     setList(rows);
   };
 
@@ -538,7 +538,7 @@ export default function App() {
         setSaveModalVisible(true);
         resetUIForNew();
       } else {
-        await updateChecklist(currentId, form);
+        await updateChecklist(currentId, form, userId);
         setOriginalForm(form);
         setSaveModalMessage('Checklist atualizado com sucesso.');
         setSaveModalVisible(true);
@@ -694,7 +694,7 @@ export default function App() {
 
   const onExportPdfItem = async (id) => {
     try {
-      const row = await getChecklist(id);
+      const row = await getChecklist(id, userId);
       if (!row) return;
 
       const getMimeFromUri = (uri) => {
@@ -817,7 +817,7 @@ export default function App() {
 
   const loadChecklist = async (id) => {
     try {
-      const row = await getChecklist(id);
+      const row = await getChecklist(id, userId);
       if (!row) return;
       const loaded = {
         nome: row.nome || '',
@@ -873,7 +873,7 @@ export default function App() {
   const onConfirmDelete = async () => {
     try {
       if (confirmDeleteId != null) {
-        await deleteChecklist(confirmDeleteId);
+        await deleteChecklist(confirmDeleteId, userId);
         await refreshList();
         if (confirmDeleteId === currentId) {
           resetForm();

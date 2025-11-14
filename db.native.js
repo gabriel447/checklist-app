@@ -71,14 +71,20 @@ export async function setUserId(value) {
   return true;
 }
 
-export async function listChecklists() {
+export async function listChecklists(userId) {
+  if (!userId) return [];
   return await db.getAllAsync(
-    'SELECT id, nome, created_at, updated_at FROM checklists ORDER BY created_at DESC'
+    'SELECT id, nome, created_at, updated_at FROM checklists WHERE userId = ? ORDER BY created_at DESC',
+    [userId]
   );
 }
 
-export async function getChecklist(id) {
-  const row = await db.getFirstAsync('SELECT * FROM checklists WHERE id = ?', [id]);
+export async function getChecklist(id, userId) {
+  if (!userId) return null;
+  const row = await db.getFirstAsync('SELECT * FROM checklists WHERE id = ? AND userId = ?', [
+    id,
+    userId,
+  ]);
   return row ?? null;
 }
 
@@ -122,7 +128,7 @@ export async function saveChecklist(data, userId) {
   return result.lastInsertRowId;
 }
 
-export async function updateChecklist(id, data) {
+export async function updateChecklist(id, data, userId) {
   const now = Date.now();
   await db.runAsync(
     `UPDATE checklists SET
@@ -132,7 +138,7 @@ export async function updateChecklist(id, data) {
       locCasaLink = ?, fotoFrenteCasa = ?, fotoFrenteCasaDataUri = ?,
       fotoInstalacao = ?, fotoInstalacaoDataUri = ?, fotoMacEquip = ?, fotoMacEquipDataUri = ?, nomeWifi = ?, senhaWifi = ?,
       testeNavegacaoOk = ?, clienteSatisfeito = ?
-    WHERE id = ?`,
+    WHERE id = ? AND userId = ?`,
     [
       now,
       data.nome || '',
@@ -156,13 +162,15 @@ export async function updateChecklist(id, data) {
       data.testeNavegacaoOk === true ? 1 : data.testeNavegacaoOk === false ? 0 : null,
       data.clienteSatisfeito === true ? 1 : data.clienteSatisfeito === false ? 0 : null,
       id,
+      userId,
     ]
   );
   return true;
 }
 
-export async function deleteChecklist(id) {
-  await db.runAsync('DELETE FROM checklists WHERE id = ?', [id]);
+export async function deleteChecklist(id, userId) {
+  if (!userId) return true;
+  await db.runAsync('DELETE FROM checklists WHERE id = ? AND userId = ?', [id, userId]);
   return true;
 }
 
