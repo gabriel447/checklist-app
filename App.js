@@ -681,7 +681,6 @@ export default function App() {
           return;
         }
       }
-      const prevShow = showWifiPassword;
       senhaWifiRef.current?.blur();
       await new Promise((r) => setTimeout(r, 50));
       const useUserId = isUuid(userId) ? userId : null;
@@ -1721,10 +1720,10 @@ export default function App() {
                   {group.items.map((it) => (
                     <View key={it.id} style={styles.listItem}>
                       <Pressable style={{ flex: 1 }} onPress={() => loadChecklist(it.id)}>
-                        <Text style={styles.listItemTitle} numberOfLines={2} ellipsizeMode="tail">{it.nome || 'Sem nome'}</Text>
+                        <Text style={styles.listItemTitle} numberOfLines={1} ellipsizeMode="tail">{it.nome || 'Sem nome'}</Text>
                         <Text style={styles.listItemSub}>{new Date(it.created_at).toLocaleDateString('pt-BR')} • {new Date(it.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
                       </Pressable>
-                      <Pressable style={[styles.btnSecondary, styles.btnInline]} disabled={isExporting && exportingId === it.id} onPress={() => onExportPdfItem(it.id)}>
+                      <Pressable style={[styles.btnSecondary, styles.btnInlineSm]} disabled={isExporting && exportingId === it.id} onPress={() => onExportPdfItem(it.id)}>
                         <View style={{ justifyContent: 'center', alignItems: 'center' }}>
                           {isExporting && exportingId === it.id ? (
                             <ActivityIndicator color="#2f6fed" style={{ position: 'absolute' }} />
@@ -1732,7 +1731,7 @@ export default function App() {
                           <Text style={[styles.btnSecondaryText, isExporting && exportingId === it.id ? { opacity: 0 } : null]}>Exportar</Text>
                         </View>
                       </Pressable>
-                      <Pressable style={[styles.delBtn, styles.btnInline]} onPress={() => onDeleteRequest(it.id)}>
+                      <Pressable style={[styles.delBtn, styles.btnInlineSm]} onPress={() => onDeleteRequest(it.id)}>
                         <Text style={styles.delBtnText}>Deletar</Text>
                       </Pressable>
                     </View>
@@ -2191,7 +2190,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    marginTop: 0,
+    //posicao da barra superior
+    marginTop: Platform.OS === 'web' ? 0 : 40,
   },
   headerInner: {
     flexDirection: 'row',
@@ -2402,6 +2402,15 @@ const styles = StyleSheet.create({
     minWidth: 100,
     flexShrink: 0,
   },
+  btnInlineSm: {
+    height: 32,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    minWidth: 88,
+    flexShrink: 0,
+  },
   btnInlineFluid: {
     height: 36,
     paddingVertical: 6,
@@ -2530,7 +2539,8 @@ const styles = StyleSheet.create({
   },
   bannerWrap: {
     position: 'absolute',
-    top: 12,
+    //posicao do banner no topo da tela
+    top: Platform.OS === 'web' ? 12 : 44,
     left: 0,
     right: 0,
     zIndex: 1000,
