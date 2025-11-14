@@ -404,13 +404,6 @@ export default function App() {
     try {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
         try {
-          const opts = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
-          const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, opts));
-          const { latitude, longitude } = pos.coords;
-          setField(fieldKey, `https://www.google.com/maps?q=${latitude},${longitude}`);
-          return;
-        } catch {}
-        try {
           const ctrl = new AbortController();
           const to = setTimeout(() => ctrl.abort(), 3000);
           const resp = await fetch('https://ipinfo.io/json', { signal: ctrl.signal });
