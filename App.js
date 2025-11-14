@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Print from 'expo-print';
+import * as Clipboard from 'expo-clipboard';
   import * as FileSystem from 'expo-file-system';
   import { shareAsync } from 'expo-sharing';
   import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -95,6 +96,55 @@ const parseMapsLink = (s) => {
   for (let i = 0; i < cand.length - 1; i++) {
     const a = cand[i], b = cand[i + 1];
     if (a >= -90 && a <= 90 && b >= -180 && b <= 180) return { lat: a, lng: b };
+  }
+  return null;
+};
+
+const isMapsUrl = (s) => {
+  const t = String(s || '').trim();
+  if (!t) return false;
+  if (!/^https?:\/\//i.test(t)) return false;
+  return /^(https?:\/\/)(maps\.app\.goo\.gl|goo\.gl\/maps|maps\.google\.com|www\.google\.com\/maps)/i.test(t);
+};
+
+const buildMapsLink = (lat, lng) => `https://www.google.com/maps?q=${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`;
+
+const extractUrlFromText = (s) => {
+  let t = String(s || '').trim();
+  t = t.replace(/^['"`\s]+|['"`\s]+$/g, '');
+  if (!/^https?:\/\//i.test(t)) {
+    const m = t.match(/https?:\/\/\S+/i);
+    if (m) {
+      t = m[0];
+    }
+  }
+  t = t.replace(/[)\]\}>]+$/g, '');
+  return t.trim();
+};
+
+const normalizeTextToUrl = (s) => {
+  const direct = extractUrlFromText(s);
+  if (direct) return direct;
+  const t = String(s || '').trim();
+  const m = t.match(/(maps\.app\.goo\.gl|goo\.gl\/maps|maps\.google\.com|www\.google\.com\/maps)[^\s'"`]+/i);
+  if (m) {
+    const tail = m[0];
+    return `https://${tail}`;
+  }
+  return '';
+};
+
+const extractOrAcceptMapsLink = (s) => {
+  const raw = normalizeTextToUrl(s);
+  const p = parseMapsLink(s);
+  if (p && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+    return buildMapsLink(p.lat, p.lng);
+  }
+  if (isMapsUrl(raw)) {
+    return raw;
+  }
+  if (isValidUrl(raw)) {
+    return raw;
   }
   return null;
 };
@@ -231,9 +281,6 @@ export default function App() {
   const locClienteRef = useRef(null);
   const locCtoRef = useRef(null);
   const locCasaRef = useRef(null);
-  const [pasteModalVisible, setPasteModalVisible] = useState(false);
-  const [pasteTargetKey, setPasteTargetKey] = useState(null);
-  const [pasteText, setPasteText] = useState('');
 
   const clearAuthFields = () => {
     setAuthEmail('');
@@ -628,35 +675,26 @@ export default function App() {
     try {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
         const txt = await navigator.clipboard.readText();
-        const p = parseMapsLink(txt);
-        if (p && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
-          const lat = Number(p.lat).toFixed(6);
-          const lng = Number(p.lng).toFixed(6);
-          setField(fieldKey, `https://www.google.com/maps?q=${lat},${lng}`);
+        const val = extractOrAcceptMapsLink(txt);
+        if (val) {
+          setField(fieldKey, val);
           return;
         }
-        Alert.alert('Erro', 'Não foi possível reconhecer coordenadas no texto copiado.');
+        Alert.alert('Erro', 'Cole um link ou coordenadas válidas do Google Maps.');
         return;
+      } else {
+        const txt = await Clipboard.getStringAsync();
+        const val = extractOrAcceptMapsLink(txt);
+        if (val) {
+          setField(fieldKey, val);
+          return;
+        }
       }
     } catch {}
-    setPasteTargetKey(fieldKey);
-    setPasteText('');
-    setPasteModalVisible(true);
-  };
-
-  const handlePasteConfirm = () => {
-    const p = parseMapsLink(pasteText);
-    if (p && pasteTargetKey) {
-      const lat = Number(p.lat).toFixed(6);
-      const lng = Number(p.lng).toFixed(6);
-      setField(pasteTargetKey, `https://www.google.com/maps?q=${lat},${lng}`);
-      setPasteModalVisible(false);
-      setPasteTargetKey(null);
-      setPasteText('');
-      return;
-    }
     Alert.alert('Erro', 'Cole um link ou coordenadas válidas do Google Maps.');
   };
+
+  
 
   
 
@@ -1435,36 +1473,7 @@ export default function App() {
         </View>
       </Modal>
 
-      <Modal
-        transparent
-        visible={pasteModalVisible}
-        animationType="fade"
-        onRequestClose={() => { setPasteModalVisible(false); setPasteTargetKey(null); setPasteText(''); }}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Colar do Maps</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Cole aqui o link do Google Maps"
-              placeholderTextColor="#9aa0b5"
-              value={pasteText}
-              onChangeText={setPasteText}
-              autoCapitalize="none"
-              autoCorrect={false}
-              spellCheck={false}
-            />
-            <View style={[styles.row, { marginTop: 12 }]}>
-              <Pressable style={[styles.btnSecondary, { flex: 1 }]} onPress={() => { setPasteModalVisible(false); setPasteTargetKey(null); setPasteText(''); }}>
-                <Text style={styles.btnSecondaryText}>Cancelar</Text>
-              </Pressable>
-              <Pressable style={[styles.btn, { flex: 1 }]} onPress={handlePasteConfirm}>
-                <Text style={styles.btnText}>Confirmar</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      
 
       {saveModalVisible ? (
         <View style={styles.bannerWrap}>
