@@ -1,22 +1,34 @@
 # Checklist
 
-Aplicativo móvel e web construído com Expo e React Native para registrar checklists de instalação/reparo. Permite coletar dados do cliente, localização via Google Maps, fotos (CTO, frente da casa, instalação, MAC), salvar localmente (SQLite no mobile, localStorage no web) e exportar um relatório em PDF.
+Aplicativo móvel e web construído com Expo e React Native para registrar checklists de instalação/reparo. Permite coletar dados do cliente, localização via Google Maps, fotos (CTO, frente da casa, instalação, MAC), autenticação de usuário e persistência no Supabase. Também exporta relatório em PDF e permite compartilhamento.
 
 ## Tecnologias
 
 - Expo SDK 54 (`expo@54.0.23`) e EAS Build
 - React (`19.1.0`) e React Native (`0.81.5`)
 - Web: `react-dom@19.1.0` e `react-native-web@0.21.0`
-- Persistência: `expo-sqlite@16.0.9` (nativo) e fallback `localStorage` (web)
+- Back-end: `@supabase/supabase-js@^2` (tabelas `users` e `checklists`)
+- Sessão (mobile): `@react-native-async-storage/async-storage@^2.2.0`
 - Arquivos: `expo-file-system@19.0.17`
 - Imagens: `expo-image-picker@^17.0.8`
 - Localização: `expo-location@^19.0.7`
 - PDF: `expo-print@~15.0.7`
 - Compartilhamento: `expo-sharing@~14.0.7`
-- UI: `expo-status-bar` e `react-native-safe-area-context@~5.6.0`
-- Ícones: `@expo/vector-icons` (Feather)
+- UI: `expo-status-bar@~3.0.8` e `react-native-safe-area-context@~5.6.0`
+- Ícones: `@expo/vector-icons` (Feather, MaterialCommunityIcons)
 
-Permissões Android: `CAMERA` e `ACCESS_FINE_LOCATION`.
+Permissões Android: `CAMERA` e `ACCESS_FINE_LOCATION`. No iOS, mensagens de uso de localização estão configuradas em `app.json`.
+
+## Ambiente
+
+Crie um arquivo `.env` na raiz baseado em `.env.example`:
+
+```env
+EXPO_PUBLIC_SUPABASE_KEY=seu_supabase_key
+EXPO_PUBLIC_SUPABASE_URL=https://sua-instancia.supabase.co
+```
+
+Para builds com EAS, defina essas variáveis como Secrets no projeto (via CLI ou Dashboard). Se as variáveis não estiverem configuradas, o app exibe uma tela informando configuração ausente.
 
 ## Como usar
 
@@ -43,7 +55,7 @@ npm install
 
 ### Fluxo básico no app
 
-1. Abra o app e edite o nome do usuário (topo da tela).
+1. Faça login ou cadastre-se (autenticação via Supabase).
 2. Preencha as seções do checklist:
    - Dados do cliente: nome, rua/número, link de localização
    - CTO/rede externa: link da CTO, cor da fibra, splitter, porta
@@ -56,6 +68,12 @@ npm install
 4. Salve o checklist.
 5. Exporte para PDF quando necessário e compartilhe.
 
+### Autenticação e perfil
+
+- Login e cadastro com e‑mail/senha.
+- Validação forte de senha e formatação/validação de CPF e telefone.
+- Atualização de perfil (nome, telefone, CPF) sincronizada na tabela `users`.
+
 ### Builds (opcional)
 
 O projeto inclui `eas.json` com perfis de build. Para usar EAS Build:
@@ -65,18 +83,20 @@ eas build --profile preview --platform android
 eas build --profile production --platform android
 ```
 
-Requer instalação do EAS CLI (`npm i -g eas-cli`) e configuração de contas/stores.
+Requer instalação do EAS CLI (`npm i -g eas-cli`) e configuração de contas/stores, além dos Secrets do Supabase.
 
 ## Estrutura
 
-- `App.js` — UI principal e lógica de fluxo
-- `index.js` — registro do componente raiz
-- `db.native.js` — persistência com SQLite (mobile)
-- `db.web.js` — persistência com `localStorage` (web)
+- `App.js` — UI principal, fluxo do checklist e telas de autenticação
+- `index.js` — registro do componente raiz e Boundary de erro
+- `db.mobile.js` — integração com Supabase no mobile (Auth + tabelas)
+- `db.web.js` — integração com Supabase na web
+- `.env.example` — variáveis de ambiente necessárias
 - `app.json` — configurações do projeto (ícones, permissões, web)
 - `assets/` — ícones e splash
 
 ## Observações
 
+- Sem `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` o app não funciona; configure `.env` para desenvolvimento e Secrets no EAS para builds.
 - No mobile, fotos podem estar em formatos diversos; a exportação para PDF faz fallback para JPEG quando o tipo não é reconhecido.
-- No web, os dados não persistem entre dispositivos; ficam apenas no navegador via `localStorage`.
+- As permissões de câmera e localização já estão declaradas em `app.json`.
