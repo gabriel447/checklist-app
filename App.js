@@ -1499,7 +1499,7 @@ export default function App() {
                 const phoneDigits = (editPhone || '').replace(/\D+/g, '');
                 const email = (editEmail || '').trim();
                 const passOk = !editNewPassword || isStrongPassword(editNewPassword);
-                const ready = !!firstName && !!lastName && phoneDigits.length >= 10 && phoneDigits.length <= 11 && isValidEmail(email) && passOk;
+                const ready = !!firstName && !!lastName && phoneDigits.length === 11 && isValidEmail(email) && passOk;
                 return (
                   <Pressable
                     style={[styles.btn, (!ready) && styles.btnDisabled, { flex: 1 }]}
