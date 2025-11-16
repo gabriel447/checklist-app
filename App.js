@@ -1711,6 +1711,7 @@ export default function App() {
               const resetReady = isValidEmail(email);
               const updateReady = isStrongPassword(authPassword) && authPasswordConfirm === authPassword;
               return (
+            <View style={styles.authActions}>
             <View style={[styles.row, authMode === 'reset' ? styles.rowReset : null]}>
               {authMode === 'login' ? (
                 <Pressable style={[styles.btn, (!loginReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!loginReady || isAuthSubmitting} onPress={async () => {
@@ -1926,10 +1927,8 @@ export default function App() {
                 </Pressable>
               )}
             </View>
-              );
-            })()}
             <Pressable
-              style={[styles.btnSecondary, { marginTop: 8 }]}
+              style={[styles.btnSecondary]}
               onPress={() => {
                 if (Platform.OS === 'web') {
                   const to = authMode === 'login' ? '/cadastrar' : '/login';
@@ -1948,6 +1947,9 @@ export default function App() {
               <Text style={styles.btnSecondaryText}>{(authMode === 'reset' || authMode === 'update_password') ? 'Voltar ao login' : authMode === 'login' ? 'Criar conta' : 'Já tenho conta'}</Text>
             </Pressable>
             </View>
+              );
+            })()}
+            </View>
           </View>
         </ScrollView>
       ) : effectiveMode === 'list' ? (
@@ -1964,7 +1966,7 @@ export default function App() {
                 expanded={!!expandedMonths[key]}
                 onToggle={() => setExpandedMonths((prev) => ({ ...prev, [key]: !prev[key] }))}
               >
-                <View style={{ marginTop: 8 }}>
+                <View style={{ marginTop: 4 }}>
                   {group.items.map((it) => (
                     <View key={it.id} style={styles.listItem}>
                       <Pressable style={{ flex: 1 }} onPress={() => loadChecklist(it.id)}>
@@ -2343,7 +2345,7 @@ export default function App() {
             <Pressable
               style={[
                 styles.btn,
-                { width: '100%', marginBottom: 0 },
+                { width: '100%' },
                 (isSaving || !canSubmit) && styles.btnDisabled,
               ]}
               onPress={onSave}
@@ -2358,7 +2360,7 @@ export default function App() {
 
             {(hasChanges && (!currentId || Platform.OS === 'web')) ? (
               <Pressable
-                style={[styles.btnSecondary, { width: '100%', marginBottom: 0 }]}
+                style={[styles.btnSecondary, { width: '100%' }]}
                 onPress={() => {
                   resetUIForNew();
                   setCurrentId(null);
@@ -2377,7 +2379,7 @@ export default function App() {
 
             {currentId ? (
               <Pressable
-                style={[styles.btnSecondary, { width: '100%', marginTop: 0 }]}
+                style={[styles.btnSecondary, { width: '100%' }]}
                 onPress={() => {
                   resetUIForNew();
                   setCurrentId(null);
@@ -2598,7 +2600,7 @@ const styles = StyleSheet.create({
   },
   rowReset: {
     marginTop: 8,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   rowSpaceBetween: {
     flexDirection: 'row',
@@ -2814,6 +2816,11 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
     marginBottom: 12,
+  },
+  authActions: {
+    flexDirection: 'column',
+    gap: 8,
+    marginTop: 8,
   },
   bannerBoxSuccess: {
     backgroundColor: '#e6f6ea',
