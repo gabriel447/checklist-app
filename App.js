@@ -272,11 +272,9 @@ export default function App() {
   const [saveModalMessage, setSaveModalMessage] = useState('');
   const [bannerType, setBannerType] = useState('success');
   const [editUserModalVisible, setEditUserModalVisible] = useState(false);
-  const [editUserName, setEditUserName] = useState('');
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
   const [editPhone, setEditPhone] = useState('');
-  const [editCpf, setEditCpf] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editNewPassword, setEditNewPassword] = useState('');
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -431,6 +429,15 @@ export default function App() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (errorMessage) {
+      setBannerType('error');
+      setSaveModalMessage(errorMessage);
+      setSaveModalVisible(true);
+    }
+    return () => {};
+  }, [errorMessage]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -1601,6 +1608,7 @@ export default function App() {
               {authMode === 'login' ? (
                 <Pressable style={[styles.btn, (!loginReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!loginReady || isAuthSubmitting} onPress={async () => {
                   setIsAuthSubmitting(true);
+                  setErrorMessage(null);
                   try {
                     const email = authEmail.trim();
                     if (!isValidEmail(email)) {
@@ -1633,14 +1641,10 @@ export default function App() {
                       }
                       await refreshList();
                     } else {
-                      setBannerType('error');
-                      setSaveModalMessage(loginRes?.error || 'Não foi possível fazer login.');
-                      setSaveModalVisible(true);
+                      setErrorMessage('Não foi possível fazer login.');
                     }
                   } catch (e) {
-                    setBannerType('error');
-                    setSaveModalMessage(e?.message || 'Não foi possível fazer login.');
-                    setSaveModalVisible(true);
+                    setErrorMessage('Não foi possível fazer login.');
                   } finally { setIsAuthSubmitting(false); }
                 }}>
                   {isAuthSubmitting ? (
