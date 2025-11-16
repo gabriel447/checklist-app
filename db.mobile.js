@@ -1,11 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-let db;
 let supabase;
+const normalizeUrl = (raw) => {
+  const t = String(raw || '').trim();
+  return /^https?:\/\//i.test(t) ? t : '';
+};
 const getClient = () => {
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const key = process.env.EXPO_PUBLIC_SUPABASE_KEY;
+  const url = normalizeUrl(process.env.EXPO_PUBLIC_SUPABASE_URL);
+  const key = String(process.env.EXPO_PUBLIC_SUPABASE_KEY || '').trim();
   if (!url || !key) return null;
   if (!supabase)
     supabase = createClient(url, key, {
@@ -19,8 +22,11 @@ const getClient = () => {
   return supabase;
 };
 
-export const isSupabaseReady = () =>
-  !!(process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_KEY);
+export const isSupabaseReady = () => {
+  const url = normalizeUrl(process.env.EXPO_PUBLIC_SUPABASE_URL);
+  const key = String(process.env.EXPO_PUBLIC_SUPABASE_KEY || '').trim();
+  return !!(url && key);
+};
 
 export async function initDB() {
   return Promise.resolve();
@@ -215,9 +221,12 @@ export async function getCurrentUser() {
 
 export async function signIn({ email, password }) {
   const client = getClient();
-  if (!client) throw new Error('Supabase não configurado');
+  if (!client) return { user: null, error: 'Supabase não configurado' };
   const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) return null;
+  if (error) {
+    try { console.log('auth:signIn error', error?.message || String(error)); } catch {}
+    return { user: null, error: error.message };
+  }
   const user = data.user || null;
   if (user) {
     try {
@@ -237,7 +246,7 @@ export async function signIn({ email, password }) {
       await client.from('users').upsert(payload);
     } catch {}
   }
-  return user;
+  return { user };
 }
 
 export async function signUp({ email, password, firstName, lastName, phone, cpf }) {

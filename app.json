@@ -1,24 +1,23 @@
 {
   "expo": {
     "name": "Checklists App",
-    "slug": "Checklists App",
+    "slug": "checklists-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-  "ios": {
+    "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para gerar o link do Google Maps no checklist.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Sua localização é usada apenas durante o uso do app para preencher o checklist."
       }
-  },
+    },
     "android": {
       "package": "com.seuempresa.checklists",
       "versionCode": 1,
@@ -35,8 +34,12 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-sqlite"
-    ]
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "b9eb72a5-8864-44e4-9732-799baf6c6650"
+      }
+    },
+    "owner": "bielbatera"
   }
 }

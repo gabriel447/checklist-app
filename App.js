@@ -21,16 +21,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Print from 'expo-print';
 import * as Clipboard from 'expo-clipboard';
-  import * as FileSystem from 'expo-file-system';
-  import { shareAsync } from 'expo-sharing';
-  import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import { shareAsync } from 'expo-sharing';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   initDB,
-  getOrCreateUserId,
   listChecklists,
   getChecklist,
-  getChecklistMeta,
-  getChecklistImages,
   saveChecklist,
   updateChecklist,
   deleteChecklist,
@@ -44,7 +41,7 @@ import {
   updateProfile,
   updateAuth,
   findUserByCpf,
-} from './db';
+} from './db.mobile';
 
 const makeInitialForm = () => ({
   nome: '',
@@ -211,6 +208,22 @@ const Section = ({ title, children, expanded, onToggle, style }) => (
 );
 
 export default function App() {
+  const envUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+  const envKey = process.env.EXPO_PUBLIC_SUPABASE_KEY || '';
+  const envReady = !!(envUrl && envKey);
+  if (!envReady) {
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#121212', padding: 20, justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 20, marginBottom: 12 }}>Configuração do Supabase ausente</Text>
+          <Text style={{ color: '#ccc', marginBottom: 6 }}>EXPO_PUBLIC_SUPABASE_URL: {envUrl || 'vazio'}</Text>
+          <Text style={{ color: '#ccc', marginBottom: 6 }}>EXPO_PUBLIC_SUPABASE_KEY: {envKey ? 'presente' : 'vazia'}</Text>
+          <Text style={{ color: '#f5c518' }}>Atualize variáveis no EAS e gere novo build</Text>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  }
+  
   const initialUserIdWeb = Platform.OS === 'web' && typeof window !== 'undefined' ? (() => {
     try {
       const id = window.localStorage.getItem('sessionUserId');
@@ -223,7 +236,7 @@ export default function App() {
   })() : null;
   const initialModeWeb = Platform.OS === 'web'
     ? ((initialUserIdWeb && typeof window !== 'undefined' && window.location && window.location.pathname && window.location.pathname !== '/login' && window.location.pathname !== '/cadastrar') ? 'editor' : 'auth')
-    : 'editor';
+    : 'auth';
   const [expanded, setExpanded] = useState({
     cliente: true,
     cto: false,
@@ -250,7 +263,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
   const [route, setRoute] = useState(
-    Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.pathname || '/home' : '/home'
+    Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.pathname || '/home' : '/login'
   );
 
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -1489,6 +1502,7 @@ export default function App() {
             <View style={styles.authBox}>
             
             <Text style={styles.title}>{authMode === 'login' ? 'Login' : 'Cadastrar'}</Text>
+            
             {authMode === 'register' ? (
               <>
                 <TextInput
@@ -1596,7 +1610,8 @@ export default function App() {
                       return;
                     }
                     try { await signOut(); } catch {}
-                    const u = await signIn({ email: email, password: authPassword });
+                    const loginRes = await signIn({ email: email, password: authPassword });
+                    const u = loginRes?.user;
                     if (u && u.id) {
                       setUserIdState(u.id);
                       await setUserId(u.id);
@@ -1619,12 +1634,12 @@ export default function App() {
                       await refreshList();
                     } else {
                       setBannerType('error');
-                      setSaveModalMessage('Não foi possível fazer login.');
+                      setSaveModalMessage(loginRes?.error || 'Não foi possível fazer login.');
                       setSaveModalVisible(true);
                     }
                   } catch (e) {
                     setBannerType('error');
-                    setSaveModalMessage('Não foi possível fazer login.');
+                    setSaveModalMessage(e?.message || 'Não foi possível fazer login.');
                     setSaveModalVisible(true);
                   } finally { setIsAuthSubmitting(false); }
                 }}>
