@@ -1479,7 +1479,7 @@ export default function App() {
                   style={styles.inputIconBtn}
                   onPress={() => setShowEditPassword((v) => !v)}
                 >
-                  <Feather name={showEditPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
+                  <Feather name={showEditPassword ? 'eye' : 'eye-off'} size={16} color="#666" />
                 </Pressable>
               </View>
               {String(editNewPassword || '').length > 0 ? (
@@ -1622,7 +1622,7 @@ export default function App() {
                     style={styles.inputIconBtn}
                     onPress={() => setShowAuthPassword((v) => !v)}
                   >
-                    <Feather name={showAuthPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
+                    <Feather name={showAuthPassword ? 'eye' : 'eye-off'} size={16} color="#666" />
                   </Pressable>
                 </View>
                 <PasswordChecklist value={authPassword} />
@@ -1645,7 +1645,7 @@ export default function App() {
                   style={styles.inputIconBtn}
                   onPress={() => setShowAuthPassword((v) => !v)}
                 >
-                  <Feather name={showAuthPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
+                  <Feather name={showAuthPassword ? 'eye' : 'eye-off'} size={16} color="#666" />
                 </Pressable>
               </View>
             ) : authMode === 'update_password' ? (
@@ -1667,7 +1667,7 @@ export default function App() {
                     style={styles.inputIconBtn}
                     onPress={() => setShowAuthPassword((v) => !v)}
                   >
-                    <Feather name={showAuthPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
+                    <Feather name={showAuthPassword ? 'eye' : 'eye-off'} size={16} color="#666" />
                   </Pressable>
                 </View>
                 <PasswordChecklist value={authPassword} />
@@ -2320,7 +2320,7 @@ export default function App() {
                 style={styles.inputIconBtn}
                 onPress={() => setShowWifiPassword((v) => !v)}
               >
-                <Feather name={showWifiPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
+                <Feather name={showWifiPassword ? 'eye' : 'eye-off'} size={16} color="#666" />
               </Pressable>
             </View>
           </Section>
@@ -2616,11 +2616,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 12,
     top: '50%',
-    transform: [{ translateY: -16 }],
+    transform: [{ translateY: -12 }],
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
-    minWidth: 36,
+    minWidth: 28,
   },
   inputIconText: {
     fontSize: 16,
@@ -2751,6 +2751,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#d7defa',
   },
