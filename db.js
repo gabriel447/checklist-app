@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import { onlyDigits, formatPhoneBR } from './utils';
 
 let supabase;
 const normalizeUrl = (raw) => {
@@ -56,19 +57,6 @@ export async function setUserId() {
 }
 
 const toIntBool = (v) => (v === true ? 1 : v === false ? 0 : null);
-const onlyDigits = (s) => String(s || '').replace(/\D+/g, '');
-const formatPhoneBR = (phone) => {
-  const d = onlyDigits(phone);
-  if (!d) return '';
-  const area = d.slice(0, 2);
-  if (d.length >= 11) {
-    return `(${area}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
-  }
-  if (d.length >= 10) {
-    return `(${area}) ${d.slice(2, 6)}-${d.slice(6, 10)}`;
-  }
-  return `(${area}) ${d.slice(2)}`;
-};
 
 export async function listChecklists(userId) {
   const client = getClient();

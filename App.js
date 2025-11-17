@@ -1,7 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  StyleSheet,
   Text,
   View,
   ScrollView,
@@ -24,6 +23,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import { shareAsync } from 'expo-sharing';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { isStrongPassword, isValidEmail, formatPhoneBR, formatCpfBR } from './utils';
   import {
     initDB,
     listChecklists,
@@ -43,6 +43,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
     findUserByCpf,
     onAuthStateChange,
   } from './db';
+import styles from './styles';
 
 const makeInitialForm = () => ({
   nome: '',
@@ -73,13 +74,6 @@ const toTitleCase = (s) => {
     .split(/\s+/)
     .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ''))
     .join(' ');
-};
-const formatPhoneBR = (s) => {
-  const d = (s || '').replace(/\D+/g, '');
-  if (d.length <= 2) return d;
-  if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7,11)}`;
 };
 
 const parseMapsLink = (s) => {
@@ -146,19 +140,6 @@ const extractOrAcceptMapsLink = (s) => {
   }
   return null;
 };
-const isStrongPassword = (s) => {
-  if (!s || s.length < 12) return false;
-  if (!/[a-z]/.test(s)) return false;
-  if (!/[A-Z]/.test(s)) return false;
-  if (!/[0-9]/.test(s)) return false;
-  if (!/[^A-Za-z0-9]/.test(s)) return false;
-  return true;
-};
-const isValidEmail = (s) => {
-  if (!s) return false;
-  const e = s.trim();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
-};
 const isValidUrl = (s) => {
   try {
     const u = new URL((s || '').trim());
@@ -179,13 +160,13 @@ const PasswordChecklist = ({ value }) => {
   const okNum = /[0-9]/.test(v);
   const okSpecial = /[^A-Za-z0-9]/.test(v);
   const Item = ({ ok, text }) => (
-    <View style={[styles.row, { marginBottom: 6 }]}> 
-      <Feather name={ok ? 'check-circle' : 'x-circle'} size={16} color={ok ? '#16a34a' : '#b91c1c'} />
-      <Text style={{ fontSize: 12, color: ok ? '#16a34a' : '#b91c1c' }}>{text}</Text>
+    <View style={[styles.row, styles.mb6]}> 
+      <Feather name={ok ? 'check-circle' : 'x-circle'} size={16} style={ok ? styles.iconOk : styles.iconError} />
+      <Text style={ok ? styles.checkItemTextOk : styles.checkItemTextError}>{text}</Text>
     </View>
   );
   return (
-    <View style={{ marginBottom: 20 }}>
+    <View style={styles.passwordChecklistWrap}>
       <Text style={[styles.label, styles.labelMuted]}>Requisitos da senha:</Text>
       <Item ok={okLen} text="Pelo menos 12 caracteres" />
       <Item ok={okLower} text="Pelo menos 1 letra minúscula" />
@@ -194,18 +175,6 @@ const PasswordChecklist = ({ value }) => {
       <Item ok={okSpecial} text="Pelo menos 1 caractere especial" />
     </View>
   );
-};
-const formatCpfBR = (s) => {
-  const d = (s || '').replace(/\D+/g, '');
-  const p1 = d.slice(0, 3);
-  const p2 = d.slice(3, 6);
-  const p3 = d.slice(6, 9);
-  const p4 = d.slice(9, 11);
-  let out = p1;
-  if (p2) out += '.' + p2;
-  if (p3) out += '.' + p3;
-  if (p4) out += '-' + p4;
-  return out;
 };
 const Section = ({ title, children, expanded, onToggle, style }) => (
   <View style={[styles.section, style]}>
@@ -224,12 +193,12 @@ export default function App() {
   if (!envReady) {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#121212', padding: 20, justifyContent: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 20, marginBottom: 12 }}>Configuração do Supabase ausente</Text>
-          <Text style={{ color: '#ccc', marginBottom: 6 }}>EXPO_PUBLIC_SUPABASE_URL: {envUrl || 'vazio'}</Text>
-          <Text style={{ color: '#ccc', marginBottom: 6 }}>EXPO_PUBLIC_SUPABASE_KEY: {envKey ? 'presente' : 'vazia'}</Text>
-          <Text style={{ color: '#f5c518' }}>Atualize variáveis no EAS e gere novo build</Text>
-        </SafeAreaView>
+        <SafeAreaView style={styles.envContainer}>
+          <Text style={styles.envTitle}>Configuração do Supabase ausente</Text>
+          <Text style={styles.envText}>EXPO_PUBLIC_SUPABASE_URL: {envUrl || 'vazio'}</Text>
+          <Text style={styles.envText}>EXPO_PUBLIC_SUPABASE_KEY: {envKey ? 'presente' : 'vazia'}</Text>
+          <Text style={styles.envWarn}>Atualize variáveis no EAS e gere novo build</Text>
+          </SafeAreaView>
       </SafeAreaProvider>
     );
   }
@@ -292,6 +261,7 @@ export default function App() {
   const [showWifiPassword, setShowWifiPassword] = useState(false);
   const senhaWifiRef = useRef(null);
   const bannerOpacity = useRef(new Animated.Value(0)).current;
+  const bannerOpacityStyle = useMemo(() => ({ opacity: bannerOpacity }), [bannerOpacity]);
   const bannerTimerRef = useRef(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locatingKey, setLocatingKey] = useState(null);
@@ -1320,7 +1290,7 @@ export default function App() {
         >
           <MaterialCommunityIcons name="account-edit" size={40} color="#6b7280" />
         </Pressable>
-        <View style={{ flexDirection: 'row', gap: 8, marginLeft: 8 }}>
+        <View style={[styles.row, styles.ml8]}>
           {effectiveMode !== 'auth' ? (
             <>
               {effectiveMode === 'editor' ? (
@@ -1351,7 +1321,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}> 
+      <View style={[styles.container, styles.centered]}> 
         <Text>Carregando...</Text>
       </View>
     );
@@ -1381,11 +1351,11 @@ export default function App() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Confirmar exclusão</Text>
             <Text style={styles.modalText}>Deseja deletar este checklist?</Text>
-            <View style={[styles.row, { marginTop: 12 }]}>
-              <Pressable style={[styles.btnSecondary, { flex: 1 }]} onPress={() => setDeleteModalVisible(false)}>
+            <View style={[styles.row, styles.mt12]}>
+              <Pressable style={[styles.btnSecondary, styles.flex1]} onPress={() => setDeleteModalVisible(false)}>
                 <Text style={styles.btnSecondaryText}>Cancelar</Text>
               </Pressable>
-              <Pressable style={[styles.btnDanger, { flex: 1 }]} onPress={onConfirmDelete}>
+              <Pressable style={[styles.btnDanger, styles.flex1]} onPress={onConfirmDelete}>
                 <Text style={styles.btnText}>Deletar</Text>
               </Pressable>
             </View>
@@ -1468,7 +1438,7 @@ export default function App() {
             </>
           <View style={styles.row}>
               <Pressable
-                style={[styles.btnSecondary, { flex: 1 }]}
+                style={[styles.btnSecondary, styles.flex1]}
                 onPress={() => setEditUserModalVisible(false)}
               >
                 <Text style={styles.btnSecondaryText}>Cancelar</Text>
@@ -1482,7 +1452,7 @@ export default function App() {
                 const ready = !!firstName && !!lastName && phoneDigits.length === 11 && isValidEmail(email) && passOk;
                 return (
                   <Pressable
-                    style={[styles.btn, (!ready) && styles.btnDisabled, { flex: 1 }]}
+                    style={[styles.btn, (!ready) && styles.btnDisabled, styles.flex1]}
                     disabled={!ready}
                     onPress={async () => {
                       try {
@@ -1515,7 +1485,7 @@ export default function App() {
 
       {saveModalVisible ? (
         <View style={styles.bannerWrap}>
-          <Animated.View style={[bannerType === 'error' ? styles.bannerBoxError : bannerType === 'warn' ? styles.bannerBoxWarn : styles.bannerBoxSuccess, { opacity: bannerOpacity }]}>
+          <Animated.View style={[bannerType === 'error' ? styles.bannerBoxError : bannerType === 'warn' ? styles.bannerBoxWarn : styles.bannerBoxSuccess, bannerOpacityStyle]}>
             <Text style={bannerType === 'error' ? styles.bannerTextError : bannerType === 'warn' ? styles.bannerTextWarn : styles.bannerTextSuccess}>{saveModalMessage}</Text>
           </Animated.View>
         </View>
@@ -1674,7 +1644,7 @@ export default function App() {
                     setMode('auth');
                   }
                 }}
-                style={{ alignSelf: 'flex-start' }}
+                style={styles.alignStart}
               >
                 <Text style={styles.linkSmall}>Esqueci minha senha</Text>
               </Pressable>
@@ -1692,7 +1662,7 @@ export default function App() {
             <View style={styles.authActions}>
             <View style={[styles.row, authMode === 'reset' ? styles.rowReset : null]}>
               {authMode === 'login' ? (
-                <Pressable style={[styles.btn, (!loginReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!loginReady || isAuthSubmitting} onPress={async () => {
+                <Pressable style={[styles.btn, (!loginReady || isAuthSubmitting) && styles.btnDisabled, styles.flex1]} disabled={!loginReady || isAuthSubmitting} onPress={async () => {
                   setIsAuthSubmitting(true);
                   setErrorMessage(null);
                   try {
@@ -1740,7 +1710,7 @@ export default function App() {
                   )}
                 </Pressable>
               ) : authMode === 'reset' ? (
-                <Pressable style={[styles.btn, (!resetReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!resetReady || isAuthSubmitting} onPress={async () => {
+                <Pressable style={[styles.btn, (!resetReady || isAuthSubmitting) && styles.btnDisabled, styles.flex1]} disabled={!resetReady || isAuthSubmitting} onPress={async () => {
                   const em = (authEmail || '').trim();
                   if (!isValidEmail(em)) {
                     setBannerType('warn');
@@ -1772,7 +1742,7 @@ export default function App() {
                   )}
                 </Pressable>
               ) : authMode === 'update_password' ? (
-                <Pressable style={[styles.btn, (!updateReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!updateReady || isAuthSubmitting} onPress={async () => {
+                <Pressable style={[styles.btn, (!updateReady || isAuthSubmitting) && styles.btnDisabled, styles.flex1]} disabled={!updateReady || isAuthSubmitting} onPress={async () => {
                   setIsAuthSubmitting(true);
                   try {
                     await updateAuth({ password: authPassword });
@@ -1800,7 +1770,7 @@ export default function App() {
                   )}
                 </Pressable>
               ) : (
-                <Pressable style={[styles.btn, (!registerReady || isAuthSubmitting) && styles.btnDisabled, { flex: 1 }]} disabled={!registerReady || isAuthSubmitting} onPress={async () => {
+                <Pressable style={[styles.btn, (!registerReady || isAuthSubmitting) && styles.btnDisabled, styles.flex1]} disabled={!registerReady || isAuthSubmitting} onPress={async () => {
                   setIsAuthSubmitting(true);
                   try {
                     const digits = (authPhone || '').replace(/\D+/g, '');
@@ -1932,19 +1902,19 @@ export default function App() {
                 expanded={!!expandedMonths[key]}
                 onToggle={() => setExpandedMonths((prev) => ({ ...prev, [key]: !prev[key] }))}
               >
-                <View style={{ marginTop: 4 }}>
+              <View style={styles.mt4}>
                   {group.items.map((it) => (
                     <View key={it.id} style={styles.listItem}>
-                      <Pressable style={{ flex: 1 }} onPress={() => loadChecklist(it.id)}>
+                    <Pressable style={styles.flex1} onPress={() => loadChecklist(it.id)}>
                         <Text style={styles.listItemTitle} numberOfLines={1} ellipsizeMode="tail">{it.nome || 'Sem nome'}</Text>
                         <Text style={styles.listItemSub}>{new Date(it.created_at).toLocaleDateString('pt-BR')} • {new Date(it.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
                       </Pressable>
                       <Pressable style={[styles.btnSecondary, styles.btnInlineSm]} disabled={isExporting && exportingId === it.id} onPress={() => onExportPdfItem(it.id)}>
-                        <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+                        <View style={styles.centered}>
                           {isExporting && exportingId === it.id ? (
-                            <ActivityIndicator color="#2f6fed" style={{ position: 'absolute' }} />
+                            <ActivityIndicator color="#2f6fed" style={styles.absolute} />
                           ) : null}
-                          <Text style={[styles.btnSecondaryText, isExporting && exportingId === it.id ? { opacity: 0 } : null]}>Exportar</Text>
+                          <Text style={[styles.btnSecondaryText, isExporting && exportingId === it.id ? styles.opacity0 : null]}>Exportar</Text>
                         </View>
                       </Pressable>
                       <Pressable style={[styles.delBtn, styles.btnInlineSm]} onPress={() => onDeleteRequest(it.id)}>
@@ -1994,12 +1964,12 @@ export default function App() {
             />
 
             <Text style={styles.label}>📍 Localização (link do Maps)</Text>
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
               <TextInput
                 style={[
                   styles.input,
                   styles.inputInline,
-                  { flex: 1 },
+                  styles.flex1,
                   form.locClienteLink ? styles.inputLinkReady : null,
                   Platform.OS === 'web' && form.locClienteLink ? styles.pointerCursor : null,
                 ]}
@@ -2033,11 +2003,11 @@ export default function App() {
             </View>
             <View style={styles.rowSpaceBetween}>
               <Pressable style={[styles.btn, styles.btnInlineFluid]} onPress={() => useCurrentLocation('locClienteLink')} disabled={isLocating}>
-                <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+              <View style={styles.centered}>
                   {isLocating && locatingKey === 'locClienteLink' ? (
-                    <ActivityIndicator color="#fff" style={{ position: 'absolute' }} />
+                <ActivityIndicator color="#fff" style={styles.absolute} />
                   ) : null}
-                  <Text style={[styles.btnText, isLocating && locatingKey === 'locClienteLink' ? { opacity: 0 } : null]}>Puxar Localização</Text>
+                  <Text style={[styles.btnText, isLocating && locatingKey === 'locClienteLink' ? styles.opacity0 : null]}>Puxar Localização</Text>
                 </View>
               </Pressable>
               <Pressable style={[styles.btnSecondary, styles.btnInlineFluid]} onPress={() => pasteFromMaps('locClienteLink')}>
@@ -2053,12 +2023,12 @@ export default function App() {
             onToggle={() => setExpanded((e) => ({ ...e, cto: !e.cto }))}
           >
             <Text style={styles.label}>📍 Localização da CTO (link do Maps)</Text>
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
               <TextInput
                 style={[
                   styles.input,
                   styles.inputInline,
-                  { flex: 1 },
+                  styles.flex1,
                   form.locCtoLink ? styles.inputLinkReady : null,
                   Platform.OS === 'web' && form.locCtoLink ? styles.pointerCursor : null,
                 ]}
@@ -2092,11 +2062,11 @@ export default function App() {
             </View>
             <View style={styles.rowSpaceBetween}>
               <Pressable style={[styles.btn, styles.btnInlineFluid]} onPress={() => useCurrentLocation('locCtoLink')} disabled={isLocating}>
-                <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+              <View style={styles.centered}>
                   {isLocating && locatingKey === 'locCtoLink' ? (
-                    <ActivityIndicator color="#fff" style={{ position: 'absolute' }} />
+                <ActivityIndicator color="#fff" style={styles.absolute} />
                   ) : null}
-                  <Text style={[styles.btnText, isLocating && locatingKey === 'locCtoLink' ? { opacity: 0 } : null]}>Puxar Localização</Text>
+                  <Text style={[styles.btnText, isLocating && locatingKey === 'locCtoLink' ? styles.opacity0 : null]}>Puxar Localização</Text>
                 </View>
               </Pressable>
               <Pressable style={[styles.btnSecondary, styles.btnInlineFluid]} onPress={() => pasteFromMaps('locCtoLink')}>
@@ -2113,7 +2083,7 @@ export default function App() {
                 </Pressable>
               </View>
             ) : null}
-            <Pressable style={[styles.btn, styles.btnCapture, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoCto')}>
+            <Pressable style={[styles.btn, styles.btnCapture, styles.mb12]} onPress={() => askCameraAndPick('fotoCto')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
 
@@ -2154,12 +2124,12 @@ export default function App() {
             onToggle={() => setExpanded((e) => ({ ...e, casa: !e.casa }))}
           >
             <Text style={styles.label}>📍 Localização da casa (link do Maps)</Text>
-            <View style={{ flex: 1 }}>
+            <View style={styles.flex1}>
               <TextInput
                 style={[
                   styles.input,
                   styles.inputInline,
-                  { flex: 1 },
+                  styles.flex1,
                   form.locCasaLink ? styles.inputLinkReady : null,
                   Platform.OS === 'web' && form.locCasaLink ? styles.pointerCursor : null,
                 ]}
@@ -2193,11 +2163,11 @@ export default function App() {
             </View>
             <View style={styles.rowSpaceBetween}>
               <Pressable style={[styles.btn, styles.btnInlineFluid]} onPress={() => useCurrentLocation('locCasaLink')} disabled={isLocating}>
-                <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+              <View style={styles.centered}>
                   {isLocating && locatingKey === 'locCasaLink' ? (
-                    <ActivityIndicator color="#fff" style={{ position: 'absolute' }} />
+                <ActivityIndicator color="#fff" style={styles.absolute} />
                   ) : null}
-                  <Text style={[styles.btnText, isLocating && locatingKey === 'locCasaLink' ? { opacity: 0 } : null]}>Puxar Localização</Text>
+                  <Text style={[styles.btnText, isLocating && locatingKey === 'locCasaLink' ? styles.opacity0 : null]}>Puxar Localização</Text>
                 </View>
               </Pressable>
               <Pressable style={[styles.btnSecondary, styles.btnInlineFluid]} onPress={() => pasteFromMaps('locCasaLink')}>
@@ -2214,7 +2184,7 @@ export default function App() {
                 </Pressable>
               </View>
             ) : null}
-            <Pressable style={[styles.btn, styles.btnCapture, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoFrenteCasa')}>
+            <Pressable style={[styles.btn, styles.btnCapture, styles.mb12]} onPress={() => askCameraAndPick('fotoFrenteCasa')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
           </Section>
@@ -2234,7 +2204,7 @@ export default function App() {
                 </Pressable>
               </View>
             ) : null}
-            <Pressable style={[styles.btn, styles.btnCapture, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoInstalacao')}>
+            <Pressable style={[styles.btn, styles.btnCapture, styles.mb12]} onPress={() => askCameraAndPick('fotoInstalacao')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
 
@@ -2247,7 +2217,7 @@ export default function App() {
                 </Pressable>
               </View>
             ) : null}
-            <Pressable style={[styles.btn, styles.btnCapture, { marginBottom: 12 }]} onPress={() => askCameraAndPick('fotoMacEquip')}>
+            <Pressable style={[styles.btn, styles.btnCapture, styles.mb12]} onPress={() => askCameraAndPick('fotoMacEquip')}>
               <Text style={styles.btnText}>Capturar/Selecionar Foto</Text>
             </Pressable>
 
@@ -2311,7 +2281,7 @@ export default function App() {
             <Pressable
               style={[
                 styles.btn,
-                { width: '100%' },
+                styles.wFull,
                 (isSaving || !canSubmit) && styles.btnDisabled,
               ]}
               onPress={onSave}
@@ -2326,7 +2296,7 @@ export default function App() {
 
             {(hasChanges && (!currentId || Platform.OS === 'web')) ? (
               <Pressable
-                style={[styles.btnSecondary, { width: '100%' }]}
+                style={[styles.btnSecondary, styles.wFull]}
                 onPress={() => {
                   resetUIForNew();
                   setCurrentId(null);
@@ -2345,7 +2315,7 @@ export default function App() {
 
             {currentId ? (
               <Pressable
-                style={[styles.btnSecondary, { width: '100%' }]}
+                style={[styles.btnSecondary, styles.wFull]}
                 onPress={() => {
                   resetUIForNew();
                   setCurrentId(null);
@@ -2364,7 +2334,7 @@ export default function App() {
 
             {currentId ? (
               <Pressable
-                style={[styles.btnDanger, { width: '100%' }]}
+                style={[styles.btnDanger, styles.wFull]}
                 onPress={() => onDeleteRequest(currentId)}
               >
                 <Text style={styles.btnText}>Deletar Checklist</Text>
@@ -2374,7 +2344,7 @@ export default function App() {
 
           {null}
 
-          <View style={{ height: 24 }} />
+          <View style={styles.spacer24} />
         </View>
         </ScrollView>
       )}
@@ -2384,508 +2354,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-const BANNER_TOP_WEB = 12;
-const BANNER_TOP_MOBILE = 44;
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fc',
-  },
-  bgGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    pointerEvents: 'none',
-  },
-  header: {
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    //posicao da barra superior
-    marginTop: Platform.OS === 'web' ? 0 : 40,
-  },
-  headerInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: Platform.OS === 'web' ? 'center' : 'auto',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#222',
-  },
-  headerLabel: {
-    color: '#555',
-    fontWeight: '600',
-  },
-  headerBtn: {
-    backgroundColor: '#2f6fed',
-    paddingHorizontal: 10,
-    paddingVertical: 0,
-    borderRadius: 8,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 12,
-    },
-  headerBtnLogout: {
-    backgroundColor: '#e53e3e',
-    borderColor: '#e53e3e',
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
-  },
-  scrollContentAuth: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingTop: 24,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 800,
-    alignSelf: Platform.OS === 'web' ? 'center' : 'auto',
-  },
-  contentAuth: {
-    maxWidth: Platform.OS === 'web' ? 420 : 600,
-    alignSelf: 'center',
-  },
-  authBox: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    boxShadow: Platform.OS === 'web' ? '0 8px 24px rgba(0,0,0,0.08)' : undefined,
-    shadowColor: Platform.OS === 'web' ? undefined : '#000',
-    shadowOpacity: Platform.OS === 'web' ? undefined : 0.08,
-    shadowRadius: Platform.OS === 'web' ? undefined : 12,
-    shadowOffset: Platform.OS === 'web' ? undefined : { width: 0, height: 6 },
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#222',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#222',
-  },
-  modalText: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 8,
-  },
-  section: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: Platform.OS === 'web' ? undefined : '#000',
-    shadowOpacity: Platform.OS === 'web' ? undefined : 0.06,
-    shadowRadius: Platform.OS === 'web' ? undefined : 6,
-    shadowOffset: Platform.OS === 'web' ? undefined : { width: 0, height: 2 },
-    elevation: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  sectionToggle: {
-    fontSize: 16,
-    color: '#777',
-  },
-  sectionBody: {
-    marginTop: 12,
-  },
-  emptyListText: {
-    color: '#666',
-  },
-  label: {
-    fontSize: 13,
-    color: '#444',
-    marginBottom: 6,
-    marginTop: 4,
-  },
-  labelMuted: {
-    color: '#9aa0b5',
-  },
-  input: {
-    backgroundColor: '#f7f8fc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'web' ? 10 : 10,
-    fontSize: Platform.OS === 'web' ? 16 : 14,
-    color: '#222',
-    marginBottom: 8,
-  },
-  inputInline: {
-    marginBottom: 0,
-    height: Platform.OS === 'web' ? 36 : 36,
-    paddingVertical: Platform.OS === 'web' ? 6 : 6,
-  },
-  inputDisabled: {
-    opacity: 0.6,
-  },
-  inputEmpty: {
-    backgroundColor: '#eef2ff',
-  },
-  inputWithIcon: {
-    paddingRight: 48,
-  },
-  inputLinkReady: {
-    color: '#1e40af',
-    fontWeight: '600',
-  },
-  pointerCursor: Platform.OS === 'web' ? { cursor: 'pointer' } : {},
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  rowReset: {
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  rowSpaceBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  inputIconBtn: {
-    position: 'absolute',
-    right: 12,
-    top: '50%',
-    transform: [{ translateY: -12 }],
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    minWidth: 28,
-  },
-  inputIconText: {
-    fontSize: 16,
-  },
-  inputHelpError: {
-    fontSize: 12,
-    color: '#b91c1c',
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  inputHelpArea: {
-    minHeight: 22,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  btn: {
-    backgroundColor: '#2f6fed',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  btnInline: {
-    height: 36,
-    paddingVertical: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    minWidth: 100,
-    flexShrink: 0,
-  },
-  btnInlineSm: {
-    height: 32,
-    paddingVertical: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    minWidth: 88,
-    flexShrink: 0,
-  },
-  btnInlineFluid: {
-    height: 36,
-    paddingVertical: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    flex: 1,
-  },
-  btnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  btnSecondary: {
-    backgroundColor: '#eef2ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d7defa',
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  btnSecondaryText: {
-    color: '#2f6fed',
-    fontWeight: '600',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  btnDanger: {
-    backgroundColor: '#e53e3e',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  btnCapture: {
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 0,
-  },
-  image: {
-    width: '100%',
-    height: Platform.OS === 'web' ? 220 : 180,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#e9ecf3',
-  },
-  imageWrapper: {
-    position: 'relative',
-  },
-  closeBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeBadgeText: {
-    color: '#fff',
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  toggleBtn: {
-    flex: 1,
-    backgroundColor: '#eef2ff',
-    paddingVertical: 6,
-    minHeight: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#d7defa',
-  },
-  toggleActive: {
-    backgroundColor: '#2f6fed',
-    borderColor: '#2f6fed',
-  },
-  toggleText: {
-    color: '#2f6fed',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  toggleTextActive: {
-    color: '#fff',
-  },
-  linkSmall: {
-    fontSize: 12,
-    color: '#2f6fed',
-    textDecorationLine: 'none',
-    marginTop: 4,
-    marginBottom: 8,
-    marginLeft: 0,
-  },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    gap: 8,
-  },
-  listItemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#222',
-  },
-  listItemSub: {
-    fontSize: 12,
-    color: '#666',
-  },
-  delBtn: {
-    backgroundColor: '#e53e3e',
-    borderRadius: 8,
-  },
-  delBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  bannerWrap: {
-    position: 'absolute',
-    top: Platform.OS === 'web' ? BANNER_TOP_WEB : BANNER_TOP_MOBILE,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    elevation: 3,
-    pointerEvents: 'none',
-    alignItems: 'center',
-  },
-  btnGroup: {
-    flexDirection: 'column',
-    gap: 8,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  authActions: {
-    flexDirection: 'column',
-    gap: 8,
-    marginTop: 8,
-  },
-  bannerBoxSuccess: {
-    backgroundColor: '#e6f6ea',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    boxShadow: Platform.OS === 'web' ? '0 6px 16px rgba(0,0,0,0.08)' : undefined,
-    shadowColor: Platform.OS === 'web' ? undefined : '#000',
-    shadowOpacity: Platform.OS === 'web' ? undefined : 0.08,
-    shadowRadius: Platform.OS === 'web' ? undefined : 10,
-    shadowOffset: Platform.OS === 'web' ? undefined : { width: 0, height: 4 },
-    borderWidth: Platform.OS === 'web' ? 1 : 0,
-    borderColor: '#b7e3c7',
-    maxWidth: Platform.OS === 'web' ? 360 : '90%',
-  },
-  bannerTextSuccess: {
-    fontSize: Platform.OS === 'web' ? 14 : 13,
-    color: '#166534',
-    textAlign: 'center',
-    fontWeight: '700',
-  },
-  bannerBoxWarn: {
-    backgroundColor: '#fef3c7',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    boxShadow: Platform.OS === 'web' ? '0 6px 16px rgba(0,0,0,0.08)' : undefined,
-    shadowColor: Platform.OS === 'web' ? undefined : '#000',
-    shadowOpacity: Platform.OS === 'web' ? undefined : 0.08,
-    shadowRadius: Platform.OS === 'web' ? undefined : 10,
-    shadowOffset: Platform.OS === 'web' ? undefined : { width: 0, height: 4 },
-    borderWidth: Platform.OS === 'web' ? 1 : 0,
-    borderColor: '#fde68a',
-    maxWidth: Platform.OS === 'web' ? 360 : '90%',
-  },
-  bannerTextWarn: {
-    fontSize: Platform.OS === 'web' ? 14 : 13,
-    color: '#7c2d12',
-    textAlign: 'center',
-    fontWeight: '700',
-  },
-  bannerBoxError: {
-    backgroundColor: '#fde8e8',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    boxShadow: Platform.OS === 'web' ? '0 6px 16px rgba(0,0,0,0.08)' : undefined,
-    shadowColor: Platform.OS === 'web' ? undefined : '#000',
-    shadowOpacity: Platform.OS === 'web' ? undefined : 0.08,
-    shadowRadius: Platform.OS === 'web' ? undefined : 10,
-    shadowOffset: Platform.OS === 'web' ? undefined : { width: 0, height: 4 },
-    borderWidth: Platform.OS === 'web' ? 1 : 0,
-    borderColor: '#f4b7b7',
-    maxWidth: Platform.OS === 'web' ? 360 : '90%',
-  },
-  bannerTextError: {
-    fontSize: Platform.OS === 'web' ? 14 : 13,
-    color: '#7f1d1d',
-    textAlign: 'center',
-    fontWeight: '700',
-  },
-  headerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#2f6fed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#dbe5ff',
-  },
-  headerIconBtn: {
-    height: 40,
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalBox: {
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 420 : 600,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    boxShadow: Platform.OS === 'web' ? '0 8px 24px rgba(0,0,0,0.16)' : undefined,
-    shadowColor: Platform.OS === 'web' ? undefined : '#000',
-    shadowOpacity: Platform.OS === 'web' ? undefined : 0.12,
-    shadowRadius: Platform.OS === 'web' ? undefined : 16,
-    shadowOffset: Platform.OS === 'web' ? undefined : { width: 0, height: 8 },
-  },
-});
