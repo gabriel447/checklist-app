@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   },
   authActions: {
     flexDirection: 'column',
-    gap: 8,
+    gap: 1,
     marginTop: 8,
   },
   bannerBoxSuccess: {
