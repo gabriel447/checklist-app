@@ -121,3 +121,4 @@ Requer instalação do EAS CLI (`npm i -g eas-cli`) e configuração de contas/s
 - Sem `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` o app não funciona; configure `.env` para desenvolvimento e Secrets no EAS para builds.
 - No mobile, fotos podem estar em formatos diversos; a exportação para PDF faz fallback para JPEG quando o tipo não é reconhecido.
 - As permissões de câmera e localização já estão declaradas em `app.json`.
+ - O dump do banco associado ao projeto está em `supabase/dump.sql`.
