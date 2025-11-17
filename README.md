@@ -74,6 +74,24 @@ npm install
 - Validação forte de senha e formatação/validação de CPF e telefone.
 - Atualização de perfil (nome, telefone, CPF) sincronizada na tabela `users`.
 
+### Recuperação de senha
+
+- Fluxo via Edge Functions do Supabase:
+  - `reset-code-send` — gera código de 6 dígitos e envia e‑mail.
+  - `reset-code-verify` — valida código (`valid: true/false`).
+  - `reset-password-apply` — aplica nova senha e marca o código como usado.
+- Secrets necessários nas Functions:
+  - `SENDGRID_API_KEY` e `MAIL_FROM` para envio de e‑mail.
+  - `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` para acesso às tabelas.
+- Recomendações de implementação das Functions:
+  - Importar `@supabase/supabase-js@2.81.1` via `https://esm.sh/@supabase/supabase-js@2.81.1`.
+  - Responder com `Content-Type: application/json` e incluir CORS.
+  - Normalizar e‑mail para minúsculas (`toLowerCase()`).
+  - Na aplicação da senha, atualizar `used_at` do registro do código.
+- Comportamento no app:
+  - Após `valid: true`, o app navega para a tela de **Alterar senha**.
+  - Ao salvar a nova senha, a tela de **Login** é aberta já com e‑mail e senha preenchidos para facilitar o acesso.
+
 ### Builds (opcional)
 
 O projeto inclui `eas.json` com perfis de build. Para usar EAS Build:
